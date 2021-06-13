@@ -8,6 +8,6 @@ class UI_Class():
 
         self.app = QApplication(sys.argv)
 
-        self.kiwwom = Kiwoom()
+        self.kiwoom = Kiwoom()
 
         self.app.exec_()
