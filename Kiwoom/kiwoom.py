@@ -1,5 +1,6 @@
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
+from PyQt5.QtTest import *
 from config.errorCode import *
 import os
 
@@ -20,10 +21,11 @@ class Kiwoom(QAxWidget):
         ##### eventloop 모음
         self.login_event_loop = None
         self.detail_account_event_loop = QEventLoop()
+        self.get_stock_data_event_loop = QEventLoop()
         ###################
 
         ##### 스크린 번호
-        self.screen_info = ["1000",]
+        self.screen_info = ["1000","2000"]
 
         if not os.path.exists('credentials.txt'):
             print('credentials is not exists')
@@ -46,6 +48,8 @@ class Kiwoom(QAxWidget):
         self.detail_account_stocks()
         # 미체결 요청
         self.non_trading_stocks()
+        #종목 분석
+        self.analysis_stock()
 
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
@@ -105,6 +109,79 @@ class Kiwoom(QAxWidget):
 
         self.detail_account_event_loop.exec_()
 
+    def get_code_list_by_market(self, market_code):
+        '''
+        종목 코드들 반환
+        :param market_code: 
+        :return: 
+        '''
+        code_list = self.getCodeListByMarket(market_code)
+        code_list = code_list.split(";")[:-1]
+
+        return code_list
+
+    def analysis_stock(self):
+        '''
+        종목 분석
+        :return:
+        '''
+        code_list_kospi = self.get_code_list_by_market("0")
+        code_list_kosdaq = self.get_code_list_by_market("10")
+        print("코스피 종목 갯수 %s" % len(code_list_kospi))
+        print(code_list_kospi)
+        print("코스닥 종목 갯수 %s" % len(code_list_kosdaq))
+        print(code_list_kosdaq)
+        list_kospi = []
+        list_kosdaq = []
+
+        if not os.path.exists('stock_list'):
+            print('stock_list is not exists')
+            return
+        else:
+            with open('stock_list', 'r') as f:
+                while True:
+                    stock = f.readline().strip()
+                    if not stock: break
+                    if stock in code_list_kospi:
+                        list_kospi.append(stock)
+                    elif stock in code_list_kosdaq:
+                        list_kosdaq.append(stock)
+                f.close()
+            if len(list_kospi) == 0 and len(list_kosdaq) == 0:
+                print('stock_list is empty')
+
+        print("코스피 종목 %s개 / 코스닥 종목 %s개 분석 시작" % (len(list_kospi), len(list_kosdaq)))
+        for idx, code in enumerate(list_kospi):
+            self.disconnectRealData(self.screen_info[1])
+            print("%s / %s : KOSPI Stock Code : %s is updating..." % (idx+1, len(list_kospi), code))
+            self.get_kiwoom_stock_data(code)
+
+        for idx, code in enumerate(list_kosdaq):
+            self.disconnectRealData(self.screen_info[1])
+            print("%s / %s : KOSDAQ Stock Code : %s is updating..." % (idx+1, len(list_kosdaq), code))
+            self.get_kiwoom_stock_data(code)
+
+
+    def get_kiwoom_stock_data(self, code=None, date=None, sPrevNext="0"):
+        '''
+        차트 일봉 조회
+        :param code:
+        :param date:
+        :param sPrevNext:
+        :return:
+        '''
+        QTest.qWait(3600)
+        self.setInputValue("종목코드", code)
+        self.setInputValue("수정주가구분", "1")
+
+        if date != None:
+            self.setInputValue("기준일자",date)
+
+        self.commRqData("주식일봉차트조회", "opt10081", sPrevNext, self.screen_info[1])
+
+        self.get_stock_data_event_loop.exec_()
+
+
     def tr_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
         tr요청 받는 slot
@@ -122,6 +199,8 @@ class Kiwoom(QAxWidget):
             self.retDetail_account_stocks(sTrCode, sRQName, sPrevNext)
         elif sRQName == "실시간미체결요청":
             self.retNon_trading_stocks(sTrCode, sRQName)
+        elif sRQName == "주식일봉차트조회":
+            self.retGet_kiwoom_stock_data(sTrCode, sRQName, sPrevNext)
 
 
     def retDetail_account(self, sTrCode, sRQName):
@@ -237,6 +316,16 @@ class Kiwoom(QAxWidget):
 
         self.detail_account_event_loop.exit()
 
+    def retGet_kiwoom_stock_data(self, sTrCode, sRQName, sPrevNext):
+        code = self.getCommData(sTrCode, sRQName, 0, "종목코드")
+        code = code.strip()
+        rows = self.getRepeatCnt(sTrCode, sRQName)
+        print("%s 일봉데이터 %s개 요청" % (code, rows))
+
+        if sPrevNext == "2":
+            self.get_kiwoom_stock_data(code=code, sPrevNext=sPrevNext)
+        else:
+            self.get_stock_data_event_loop.exit()
 
     def setInputValue(self, name, value):
         self.dynamicCall("SetInputValue(QString, QString)", name, value)
@@ -249,6 +338,12 @@ class Kiwoom(QAxWidget):
 
     def getRepeatCnt(self, sTrCode, sRQName):
         return self.dynamicCall("GetRepeatCnt(QString, QString)", sTrCode, sRQName)
+
+    def getCodeListByMarket(self, market_code):
+        return self.dynamicCall("GetCodeListByMarket(QString)", market_code)
+
+    def disconnectRealData(self, sScrNo):
+        self.dynamicCall("DisconnectRealData(QString)", sScrNo)
 
 
 
