@@ -4,6 +4,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtTest import *
 from config.errorCode import *
 from DataBase.SqliteDB import StockDB
+from DataBase.StockDataTaLib import StockData
 from datetime import date, timedelta
 import os
 
@@ -19,12 +20,14 @@ class Kiwoom(QAxWidget):
         self.pwtype = ''
         self.use_money = 0
         self.user_money_ratio = 0.5
-        self.account_stocks_detail = {}
-        self.non_trading_stocks_detail = {}
-        self.daily_stock_data = {}
+        self.account_stocks_detail = {} # 계좌 잔고 현황
+        self.non_trading_stocks_detail = {} # 미체결 데이터
+        self.daily_stock_data = {} # 일봉 데이터
+        self.limits = {}  # 일봉 저장 데이터 갯수 제한
         self.yesterday = (self.today - timedelta(1)).strftime("%Y%m%d")
         print(self.yesterday)
         self.stock_db = StockDB()
+
 
         ##### eventloop 모음
         self.login_event_loop = None
@@ -146,35 +149,51 @@ class Kiwoom(QAxWidget):
             print('stock_list.txt is not exists')
             return
         else:
-            with open('stock_list.txt', 'r') as f:
+            with open('stock_list.txt', 'r', encoding='UTF-8') as f:
                 while True:
                     stock = f.readline().strip()
                     if not stock: break
-                    if stock in code_list_kospi:
+                    stock = tuple(stock.split(';'))
+                    if stock[0] in code_list_kospi:
                         list_kospi.append(stock)
-                    elif stock in code_list_kosdaq:
+                    elif stock[0] in code_list_kosdaq:
                         list_kosdaq.append(stock)
                 f.close()
             if len(list_kospi) == 0 and len(list_kosdaq) == 0:
                 print('stock_list.txt is empty')
 
         print("코스피 종목 %s개 / 코스닥 종목 %s개 분석 시작" % (len(list_kospi), len(list_kosdaq)))
-        for idx, code in enumerate(list_kospi):
+        for idx, tp in enumerate(list_kospi):
             self.disconnectRealData(self.screen_info[1])
-            print("%s / %s : KOSPI Stock Code : %s is updating..." % (idx+1, len(list_kospi), code))
+            code = tp[0]
+            name = tp[1]
+            print("%s / %s : KOSPI Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kospi), code, name))
             tname = self.stock_db.getTableName(code)
             if self.stock_db.checkTableName(tname) == False:
                 if self.stock_db.createTable(tname) == False:
                     continue
 
+            if code not in self.limits.keys():
+                self.limits.update({code : 0})
             self.get_kiwoom_stock_data(code, self.yesterday)
             df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
+            df = df.iloc[::-1]
             print(f"index: {df.index}")
+            sd = StockData(code, df).calcIndicators()
+            sd = sd.iloc[::-1]
+            print(sd)
             self.stock_db.save(tname, df)
 
-        for idx, code in enumerate(list_kosdaq):
+            if idx == 1: #DB에 잘 들어가는지 테스트용
+                df = self.stock_db.load(tname)
+                if df is None:
+                    continue
+
+        for idx, tp in enumerate(list_kosdaq):
             self.disconnectRealData(self.screen_info[1])
-            print("%s / %s : KOSDAQ Stock Code : %s is updating..." % (idx+1, len(list_kosdaq), code))
+            code = tp[0]
+            name = tp[1]
+            print("%s / %s : KOSDAQ Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kosdaq), code, name))
             tname = self.stock_db.getTableName(code)
             if self.stock_db.checkTableName(tname) == False:
                 if self.stock_db.createTable(tname) == False:
@@ -346,6 +365,9 @@ class Kiwoom(QAxWidget):
         cnt = self.getRepeatCnt(sTrCode, sRQName)
         print("%s 일봉데이터 %s개 요청" % (code, cnt))
 
+        limit = self.limits[code] + 1
+        self.limits.update({code:limit})
+
         for idx in range(cnt):
             close_price = self.getCommData(sTrCode, sRQName, idx, "현재가")
             close_price = int(close_price.strip())
@@ -376,7 +398,7 @@ class Kiwoom(QAxWidget):
             data.update({"close":close_price})
             data.update({"volume": value})
 
-        if sPrevNext == "2":
+        if sPrevNext == "2" and limit < 3: # 1800개 이상 받지 않음
             self.get_kiwoom_stock_data(code=code, sPrevNext=sPrevNext)
         else:
             self.get_stock_data_event_loop.exit()
