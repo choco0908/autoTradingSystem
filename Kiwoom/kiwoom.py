@@ -1,13 +1,17 @@
+import pandas as pd
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
 from PyQt5.QtTest import *
 from config.errorCode import *
+from DataBase.SqliteDB import StockDB
+from datetime import date, timedelta
 import os
 
 class Kiwoom(QAxWidget):
     def __init__(self):
         super().__init__()
-        print("[+] Kiwoom init called")
+        self.today = date.today()
+        print("[+] Kiwoom init called at %s" % self.today)
 
         #init values
         self.account_num = ''
@@ -17,6 +21,10 @@ class Kiwoom(QAxWidget):
         self.user_money_ratio = 0.5
         self.account_stocks_detail = {}
         self.non_trading_stocks_detail = {}
+        self.daily_stock_data = {}
+        self.yesterday = (self.today - timedelta(1)).strftime("%Y%m%d")
+        print(self.yesterday)
+        self.stock_db = StockDB()
 
         ##### eventloop 모음
         self.login_event_loop = None
@@ -134,11 +142,11 @@ class Kiwoom(QAxWidget):
         list_kospi = []
         list_kosdaq = []
 
-        if not os.path.exists('stock_list'):
-            print('stock_list is not exists')
+        if not os.path.exists('stock_list.txt'):
+            print('stock_list.txt is not exists')
             return
         else:
-            with open('stock_list', 'r') as f:
+            with open('stock_list.txt', 'r') as f:
                 while True:
                     stock = f.readline().strip()
                     if not stock: break
@@ -148,18 +156,34 @@ class Kiwoom(QAxWidget):
                         list_kosdaq.append(stock)
                 f.close()
             if len(list_kospi) == 0 and len(list_kosdaq) == 0:
-                print('stock_list is empty')
+                print('stock_list.txt is empty')
 
         print("코스피 종목 %s개 / 코스닥 종목 %s개 분석 시작" % (len(list_kospi), len(list_kosdaq)))
         for idx, code in enumerate(list_kospi):
             self.disconnectRealData(self.screen_info[1])
             print("%s / %s : KOSPI Stock Code : %s is updating..." % (idx+1, len(list_kospi), code))
-            self.get_kiwoom_stock_data(code)
+            tname = self.stock_db.getTableName(code)
+            if self.stock_db.checkTableName(tname) == False:
+                if self.stock_db.createTable(tname) == False:
+                    continue
+
+            self.get_kiwoom_stock_data(code, self.yesterday)
+            df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
+            print(f"index: {df.index}")
+            self.stock_db.save(tname, df)
 
         for idx, code in enumerate(list_kosdaq):
             self.disconnectRealData(self.screen_info[1])
             print("%s / %s : KOSDAQ Stock Code : %s is updating..." % (idx+1, len(list_kosdaq), code))
-            self.get_kiwoom_stock_data(code)
+            tname = self.stock_db.getTableName(code)
+            if self.stock_db.checkTableName(tname) == False:
+                if self.stock_db.createTable(tname) == False:
+                    continue
+
+            self.get_kiwoom_stock_data(code, self.yesterday)
+            df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
+            print(f"index: {df.index}")
+            self.stock_db.save(tname, df)
 
 
     def get_kiwoom_stock_data(self, code=None, date=None, sPrevNext="0"):
@@ -319,8 +343,38 @@ class Kiwoom(QAxWidget):
     def retGet_kiwoom_stock_data(self, sTrCode, sRQName, sPrevNext):
         code = self.getCommData(sTrCode, sRQName, 0, "종목코드")
         code = code.strip()
-        rows = self.getRepeatCnt(sTrCode, sRQName)
-        print("%s 일봉데이터 %s개 요청" % (code, rows))
+        cnt = self.getRepeatCnt(sTrCode, sRQName)
+        print("%s 일봉데이터 %s개 요청" % (code, cnt))
+
+        for idx in range(cnt):
+            close_price = self.getCommData(sTrCode, sRQName, idx, "현재가")
+            close_price = int(close_price.strip())
+            value = self.getCommData(sTrCode, sRQName, idx, "거래량")
+            value = int(value.strip())
+            date = self.getCommData(sTrCode, sRQName, idx, "일자")
+            date = date.strip()
+            open_price = self.getCommData(sTrCode, sRQName, idx, "시가")
+            open_price = int(open_price.strip())
+            high_price = self.getCommData(sTrCode, sRQName, idx, "고가")
+            high_price = int(high_price.strip())
+            low_price = self.getCommData(sTrCode, sRQName, idx, "저가")
+            low_price = int(low_price.strip())
+
+            if code in self.daily_stock_data:
+                pass
+            else:
+                self.daily_stock_data.update({code: {}})
+            if date in self.daily_stock_data[code]:
+                pass
+            else:
+                self.daily_stock_data[code].update({date: {}})
+            data = self.daily_stock_data[code][date]
+            data.update({"date": date})
+            data.update({"open": open_price})
+            data.update({"high": high_price})
+            data.update({"low": low_price})
+            data.update({"close":close_price})
+            data.update({"volume": value})
 
         if sPrevNext == "2":
             self.get_kiwoom_stock_data(code=code, sPrevNext=sPrevNext)
