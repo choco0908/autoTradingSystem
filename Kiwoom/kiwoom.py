@@ -106,9 +106,7 @@ class Kiwoom(QAxWidget):
             screen_no = self.portfolio_stocks_detail[code]['스크린번호']
             fid = self.realType.REALTYPE['주식체결']['체결시간']
             self.setRealReg(screen_no, code, fid, "1")
-
-        sys.exit()
-
+    
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
 
