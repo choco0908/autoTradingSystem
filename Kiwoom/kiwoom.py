@@ -14,6 +14,7 @@ from DataBase.StockDataTaLib import StockData
 from datetime import date, timedelta
 from enum import Enum
 import os
+import sys
 
 class ScreenNumber(Enum):
     ACCOUNT = 0         # 1000:계좌현황
@@ -26,9 +27,8 @@ class ScreenNumber(Enum):
 class Kiwoom(QAxWidget):
     def __init__(self):
         super().__init__()
-        self.logging = Logging()
         self.today = date.today()
-        self.logging.logger.debug("[+] Kiwoom init called at %s" % self.today)
+        print("[+] Kiwoom init called at %s" % self.today)
 
         #init values
         self.account_num = ''
@@ -62,7 +62,7 @@ class Kiwoom(QAxWidget):
 
         # 계좌 정보
         if not os.path.exists('credentials.txt'):
-            self.logging.logger.debug('credentials is not exists')
+            print('credentials is not exists')
             return
         else:
             with open('credentials.txt', 'r') as f:
@@ -72,7 +72,7 @@ class Kiwoom(QAxWidget):
 
         # Buy / Sell 종목
         if not os.path.exists('DataBase/DB/buy_sell_action.txt'):
-            self.logging.logger.debug('buy_sell_action.txt is not exists')
+            print('buy_sell_action.txt is not exists')
             return
         else:
             with open('DataBase/DB/buy_sell_action.txt', 'r', encoding='UTF-8') as f:
@@ -115,9 +115,10 @@ class Kiwoom(QAxWidget):
     def event_slots(self):
         self.OnEventConnect.connect(self.login_slot)
         self.OnReceiveTrData.connect(self.tr_slot)
+        self.OnReceiveMsg.connect(self.msg_slot)
 
     def login_slot(self, errorCode):
-        self.logging.logger.debug(errors(errorCode))
+        print(errors(errorCode))
         self.login_event_loop.exit()
 
     def real_event_slots(self):
@@ -134,7 +135,7 @@ class Kiwoom(QAxWidget):
         self.account_num = account_list.split(';')[0]
         user_name = self.getLoginInfo("USER_NAME")
         server_gubun = self.getLoginInfo("GetServerGubun")
-        self.logging.logger.debug('%s is login , 계좌번호 %s \nserver %s connected' % (user_name,self.account_num,server_gubun))
+        print('%s is login , 계좌번호 %s \nserver %s connected' % (user_name,self.account_num,server_gubun))
 
     def detail_account(self):
         self.setInputValue("계좌번호", self.account_num)
@@ -145,7 +146,7 @@ class Kiwoom(QAxWidget):
         self.detail_account_event_loop.exec_()
 
     def detail_account_stocks(self, sPrevNext="0"):
-        self.logging.logger.debug('계좌평가잔고내역 확인')
+        print('계좌평가잔고내역 확인')
         self.setInputValue("계좌번호", self.account_num)
         self.setInputValue("비밀번호", self.passwd)
         self.setInputValue("비밀번호입력매체구분", self.pwtype)
@@ -175,7 +176,7 @@ class Kiwoom(QAxWidget):
         list_kosdaq = []
 
         if not os.path.exists('stock_list.txt'):
-            self.logging.logger.debug('stock_list.txt is not exists')
+            print('stock_list.txt is not exists')
             return
         else:
             with open('stock_list.txt', 'r', encoding='UTF-8') as f:
@@ -189,14 +190,14 @@ class Kiwoom(QAxWidget):
                         list_kosdaq.append(stock)
                 f.close()
             if len(list_kospi) == 0 and len(list_kosdaq) == 0:
-                self.logging.logger.debug('stock_list.txt is empty')
+                print('stock_list.txt is empty')
 
-        self.logging.logger.debug("코스피 종목 %s개 / 코스닥 종목 %s개 분석 시작" % (len(list_kospi), len(list_kosdaq)))
+        print("코스피 종목 %s개 / 코스닥 종목 %s개 분석 시작" % (len(list_kospi), len(list_kosdaq)))
         for idx, tp in enumerate(list_kospi):
             self.disconnectRealData(self.screen_info[self.e.CHART_DATA.value])
             code = tp[0]
             name = tp[1]
-            self.logging.logger.debug("%s / %s : KOSPI Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kospi), code, name))
+            print("%s / %s : KOSPI Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kospi), code, name))
             tname = self.stock_db.getTableName(code)
             if self.stock_db.checkTableName(tname) == False:
                 if self.stock_db.createTable(tname) == False:
@@ -207,10 +208,10 @@ class Kiwoom(QAxWidget):
             self.get_kiwoom_stock_data(code, self.yesterday)
             df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
             df = df.iloc[::-1]
-            self.logging.logger.debug(f"index: {df.index}")
+            print(f"index: {df.index}")
             sd = StockData(code, df).calcIndicators()
             sd = sd.iloc[::-1]
-            self.logging.logger.debug(sd)
+            print(sd)
             self.stock_db.save(tname, df)
 
             if idx == 1: #DB에 잘 들어가는지 테스트용
@@ -222,7 +223,7 @@ class Kiwoom(QAxWidget):
             self.disconnectRealData(self.screen_info[self.e.CHART_DATA.value])
             code = tp[0]
             name = tp[1]
-            self.logging.logger.debug("%s / %s : KOSDAQ Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kosdaq), code, name))
+            print("%s / %s : KOSDAQ Stock Code : %s Name : %s is updating..." % (idx+1, len(list_kosdaq), code, name))
             tname = self.stock_db.getTableName(code)
             if self.stock_db.checkTableName(tname) == False:
                 if self.stock_db.createTable(tname) == False:
@@ -230,7 +231,7 @@ class Kiwoom(QAxWidget):
 
             self.get_kiwoom_stock_data(code, self.yesterday)
             df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
-            self.logging.logger.debug(f"index: {df.index}")
+            print(f"index: {df.index}")
             self.stock_db.save(tname, df)
 
     def get_kiwoom_stock_data(self, code=None, date=None, sPrevNext="0"):
@@ -256,7 +257,7 @@ class Kiwoom(QAxWidget):
             if code not in code_list:
                 code_list.append(code)
         #사야할 종목
-        self.logging.logger.debug(self.buy_sell_stocks_detail)
+        print(self.buy_sell_stocks_detail)
         for code in self.buy_sell_stocks_detail.keys():
             if code not in code_list:
                 code_list.append(code)
@@ -285,9 +286,9 @@ class Kiwoom(QAxWidget):
         :param sScrNo: 스크린번호
         :param sRQName: 요청명
         :param sTrCode: tr코드
-        :param sRecordName: 사용 X 
+        :param sRecordName: 사용 X
         :param sPrevNext: 다음 페이지 여부  없음(0 or "") 있음 (2)
-        :return: 
+        :return:
         '''
 
         if sRQName == "예수금상세현황":
@@ -303,19 +304,19 @@ class Kiwoom(QAxWidget):
         deposit = self.getCommData(sTrCode, sRQName, 0, "예수금")
         self.use_money = int(deposit) * self.user_money_ratio
         candeposit = self.getCommData(sTrCode, sRQName, 0, "출금가능금액")
-        self.logging.logger.debug("예수금 : %s 출금가능금액 : %s" % (int(deposit), int(candeposit)))
+        print("예수금 : %s 출금가능금액 : %s" % (int(deposit), int(candeposit)))
         self.detail_account_event_loop.exit()
 
     def retDetail_account_stocks(self, sTrCode, sRQName, sPrevNext):
         total_portfolio_stocks = self.getCommData(sTrCode, sRQName, 0, "총매입금액")
         win_portfolio_rate = self.getCommData(sTrCode, sRQName, 0, "총수익률(%)")
-        self.logging.logger.debug("총매입금액 : %s 총수익률 : %s%%" % (int(total_portfolio_stocks), float(win_portfolio_rate)))
+        print("총매입금액 : %s 총수익률 : %s%%" % (int(total_portfolio_stocks), float(win_portfolio_rate)))
 
         rows = self.getRepeatCnt(sTrCode, sRQName)
         cnt = 0
 
         if rows == 0:
-            self.logging.logger.debug("계좌에 조회할 종목이 없습니다.")
+            print("계좌에 조회할 종목이 없습니다.")
 
         for idx in range(rows):
             code = self.getCommData(sTrCode, sRQName, idx, "종목번호").strip()[1:]  # 영어 제외 종목코드만
@@ -333,7 +334,7 @@ class Kiwoom(QAxWidget):
                 self.account_stocks_detail.update({code: {}})
             account_stock_detail = self.account_stocks_detail[code]
             account_stock_detail.update({"종목명": code_name, "보유수량": stock_quantity, "매입가": buy_price, "수익률(%)": win_ratio, "현재가": current_price, "매입금액": total_buy_price, "매매가능수량": possible_quantity})
-            self.logging.logger.debug(account_stock_detail)
+            print(account_stock_detail)
             cnt += 1
 
         if sPrevNext == "2":
@@ -346,7 +347,7 @@ class Kiwoom(QAxWidget):
         cnt = 0
 
         if rows == 0:
-            self.logging.logger.debug("미체결된 종목이 없습니다.")
+            print("미체결된 종목이 없습니다.")
 
         for idx in range(rows):
             code = self.getCommData(sTrCode, sRQName, idx, "종목코드").strip()
@@ -366,7 +367,7 @@ class Kiwoom(QAxWidget):
             non_trading_stock_detail = self.non_trading_stocks_detail[order_no]
             non_trading_stock_detail.update({"종목코드": code, "종목명": code_name, "주문번호": order_no, "주문상태": order_status, "주문수량": order_quantity, "주문가격": order_price,
                                              "주문구분": order_gubun, "미체결수량": non_trading_quantity, "체결량": trading_quantity})
-            self.logging.logger.debug("미체결 종목 : %s" % non_trading_stock_detail)
+            print("미체결 종목 : %s" % non_trading_stock_detail)
         self.detail_account_event_loop.exit()
 
     def retGet_kiwoom_stock_data(self, sTrCode, sRQName, sPrevNext):
@@ -411,14 +412,15 @@ class Kiwoom(QAxWidget):
         value = self.getCommRealData(sCode, fid)
 
         if value == '0':
-            self.logging.logger.debug("장 시작 전")
+            print("장 시작 전")
         elif value == '2':
-            self.logging.logger.debug("장 종료, 동시호가 시간")
+            print("장 종료, 동시호가 시간")
         elif value == '3':
             self.stock_market_isopen = True
-            self.logging.logger.debug("장 시작")
+            print("장 시작")
         elif value == '4':
-            self.logging.logger.debug("3시 30분 장 종료")
+            print("3시 30분 장 종료")
+            self.finishApplication()
 
     def retRealData_transferred(self, sCode, sRealType):
         time_str = self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['체결시간']) # HHMMSS
@@ -441,7 +443,7 @@ class Kiwoom(QAxWidget):
                                                     "시가": open_price, "저가": low_price})
 
         # 장중 실시간 조건에 따라 매도 / 매수
-        # self.logging.logger.debug(self.portfolio_stocks_detail[sCode])
+        # print(self.portfolio_stocks_detail[sCode])
         if self.stock_market_isopen: # 장종료전 한번 요청
             for code, detail in self.buy_sell_stocks_detail.items():
                 stock = self.account_stocks_detail[code]
@@ -454,10 +456,10 @@ class Kiwoom(QAxWidget):
                     sucess =self.sendOrder("신규매도", self.portfolio_stocks_detail[code]['주문용스크린번호'], self.account_num, 2, code,
                                    min(stock['매매가능수량'], detail["수량"]), 0, self.realType.SENDTYPE['거래구분']['시장가'], "")
                 if sucess == 0:
-                    self.logging.logger.debug("%s:%s %s개 %s 주문 성공" % (code, detail['종목명'], detail['수량'], detail['액션']))
+                    print("%s:%s %s개 %s 주문 성공" % (code, detail['종목명'], detail['수량'], detail['액션']))
                     del self.buy_sell_stocks_detail[code]
                 else:
-                    self.logging.logger.debug("%s:%s %s개 %s 주문 실패" % (code, detail['종목명'], detail['수량'], detail['액션']))
+                    print("%s:%s %s개 %s 주문 실패" % (code, detail['종목명'], detail['수량'], detail['액션']))
             self.stock_market_isopen = False
 
         non_trading_list = list(self.non_trading_stocks_detail)
@@ -471,9 +473,9 @@ class Kiwoom(QAxWidget):
                 sucess = self.sendOrder("매수최소", self.portfolio_stocks_detail[sCode]["주문용스크린번호"], self.account_num, 3, code, 0, 0,
                                         self.realType.SENDTYPE["거래구분"]["지정가"], order_no)
                 if sucess == 0:
-                    self.logging.logger.debug("매수취소 전달 성공")
+                    print("매수취소 전달 성공")
                 else:
-                    self.logging.logger.debug("매수취소 전달 실패")
+                    print("매수취소 전달 실패")
             elif non_trading_count == 0:
                 del self.non_trading_stocks_detail[order_no]
 
@@ -504,7 +506,7 @@ class Kiwoom(QAxWidget):
                                                                   "주문수량": order_count, "주문가격": order_price, "미체결수량": non_trading_count, "원주문번호": order_no_org,
                                                                   "주문구분": order_gubun, "주문/체결시간": time_str, "체결가": action_price, "체결량": action_count,
                                                                   "현재가": current_price, "(최우선)매도호가": first_sell_price, "(최우선)매수호가": first_buy_price})
-            self.logging.logger.debug(self.non_trading_stocks_detail[order_no_last])
+            print(self.non_trading_stocks_detail[order_no_last])
         elif sGubun == '1': # 잔고 변경
             account_num = self.getChejanData(self.realType.REALTYPE['잔고']['계좌번호'])
             sCode = self.getChejanData(self.realType.REALTYPE['잔고']['종목코드'])[1:]
@@ -529,7 +531,18 @@ class Kiwoom(QAxWidget):
                 del self.jango_dict[sCode]
                 self.setRealRemove(self.portfolio_stocks_detail[sCode]['스크린번호'], sCode)
             else:
-                self.logging.logger.debug(self.jango_dict[sCode])
+                print(self.jango_dict[sCode])
+
+    #증권사로부터 송수신 메시지 get
+    def msg_slot(self, sScrNo, sRQName, sTrCode, msg):
+        print("스크린: %s, 요청이름: %s, tr코드: %s --- %s" % (sScrNo, sRQName, sTrCode, msg))
+
+    def finishApplication(self):
+        for code in self.portfolio_stocks_detail.keys():
+            self.setRealRemove(self.portfolio_stocks_detail[code]["스크린번호"], code)
+
+        QTest.qWait(5000)
+        sys.exit()
 
     def getLoginInfo(self, name):
         # "ACCOUNT_CNT": 보유계좌 갯수
