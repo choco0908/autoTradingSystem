@@ -23,7 +23,6 @@ class ScreenNumber(Enum):
     ACTION_SCRNO = 3    # 4000:매매용 스크린번호
     REAL = 4            # 5000:실시간 조회
 
-
 class Kiwoom(QAxWidget):
     def __init__(self):
         super().__init__()
@@ -98,16 +97,17 @@ class Kiwoom(QAxWidget):
         self.non_trading_stocks()
         # 종목별 스크린번호 부여
         self.set_screen_number()
-        # 종목 분석
-        # self.analysis_stock()
         # 장운영시간 확인
         self.get_stock_market_status()
 
         # 실시간 주식 거래시 등록
+
         for code in self.portfolio_stocks_detail.keys():
             screen_no = self.portfolio_stocks_detail[code]['스크린번호']
             fid = self.realType.REALTYPE['주식체결']['체결시간']
             self.setRealReg(screen_no, code, fid, "1")
+
+        sys.exit()
 
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
@@ -416,10 +416,15 @@ class Kiwoom(QAxWidget):
         elif value == '2':
             print("장 종료, 동시호가 시간")
         elif value == '3':
-            self.stock_market_isopen = True
-            print("장 시작")
+            if self.stock_market_isopen == False:
+                self.stock_market_isopen = True
+                print("장 시작")
         elif value == '4':
             print("3시 30분 장 종료")
+        elif value == '8':
+            print("장 종료")
+        elif value == '9':
+            print("장 마감")
             self.finishApplication()
 
     def retRealData_transferred(self, sCode, sRealType):
@@ -444,7 +449,7 @@ class Kiwoom(QAxWidget):
 
         # 장중 실시간 조건에 따라 매도 / 매수
         # print(self.portfolio_stocks_detail[sCode])
-        if self.stock_market_isopen: # 장종료전 한번 요청
+        if self.stock_market_isopen: # 시장가로 한번 요청
             for code, detail in self.buy_sell_stocks_detail.items():
                 stock = self.account_stocks_detail[code]
                 max_stock_count = int(self.use_money / first_buy_price)
@@ -469,14 +474,9 @@ class Kiwoom(QAxWidget):
             non_trading_count = self.non_trading_stocks_detail[order_no]["미체결수량"]
             order_gubun = self.non_trading_stocks_detail[order_no]["주문구분"]
 
-            if order_gubun == "매수" and non_trading_count > 0 and first_sell_price > trading_price: # 전량 취소
-                sucess = self.sendOrder("매수최소", self.portfolio_stocks_detail[sCode]["주문용스크린번호"], self.account_num, 3, code, 0, 0,
-                                        self.realType.SENDTYPE["거래구분"]["지정가"], order_no)
-                if sucess == 0:
-                    print("매수취소 전달 성공")
-                else:
-                    print("매수취소 전달 실패")
-            elif non_trading_count == 0:
+            if non_trading_count > 0:
+                print("%s %s개 %s주문 미체결" % (code, non_trading_count, order_gubun))
+            else:
                 del self.non_trading_stocks_detail[order_no]
 
     def chejan_slot(self, sGubun, nItemCnt, sFIdList):

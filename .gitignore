@@ -4,3 +4,13 @@
 *.bat
 DataBase/DB/stocks.db
 log/
+
+chart_data/
+epoch_summary/
+logs/
+preprocessed_chart_data/
+models/
+data/
+output/
+
+QuantStrategy.md
