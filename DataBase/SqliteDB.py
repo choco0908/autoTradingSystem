@@ -69,7 +69,6 @@ class StockDB:
         conn = None
         try:
             conn = sqlite3.connect(file)
-            print(sqlite3.version)
             return conn
         except Error as e:
             print(e)
