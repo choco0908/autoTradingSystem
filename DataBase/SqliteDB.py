@@ -7,6 +7,35 @@ class StockDB:
     def __init__(self):
         self.conn = self.createConnection('DataBase/DB/stocks.db')
 
+    def createBasicInfoTable(self):
+        with self.conn as c:
+            try:
+                cur = c.cursor()
+                create_sql = "CREATE TABLE stock_basic_info (code TEXT PRIMARY KEY, name TEXT, maketcap INTEGER, per REAL, eps REAL, roe REAL, pbr REAL, multiple REAL);"
+                cur.execute(create_sql)
+                return True
+            except:
+                print("basic_info table creating fail")
+
+    def saveBasicInfoTable(self, dataframe):
+        with self.conn as c:
+            try:
+                cur = c.cursor()
+                sql = "INSERT OR REPLACE INTO stock_basic_info ('code', 'name', 'maketcap', 'per', 'eps', 'roe', 'pbr', 'multiple') VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
+                cur.executemany(sql, dataframe.values)
+                c.commit()
+            except:
+                return None
+
+    def loadBasicInfoTable(self):
+        with self.conn as c:
+            try:
+                sql = "SELECT code, name, maketcap, per, eps, roe, pbr, multiple FROM stock_basic_info"
+                df = pd.read_sql(sql, c, index_col=None)
+                return df
+            except:
+                return None
+
     def createTable(self, tname):
         with self.conn as c:
             try:
@@ -15,7 +44,7 @@ class StockDB:
                 cur.execute(create_sql)
                 return True
             except:
-                print("[%s] creating fail" % tname)
+                print("[%s] table creating fail" % tname)
 
     def save(self, tname, dataframe):
         with self.conn as c:

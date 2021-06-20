@@ -22,10 +22,10 @@ class Kiwoom(QAxWidget):
         self.user_money_ratio = 0.5
         self.account_stocks_detail = {} # 계좌 잔고 현황
         self.non_trading_stocks_detail = {} # 미체결 데이터
+        self.portfolio_stocks_detail = {} # 사야할 종목 데이터
         self.daily_stock_data = {} # 일봉 데이터
         self.limits = {}  # 일봉 저장 데이터 갯수 제한
         self.yesterday = (self.today - timedelta(1)).strftime("%Y%m%d")
-        print(self.yesterday)
         self.stock_db = StockDB()
 
 
@@ -36,7 +36,8 @@ class Kiwoom(QAxWidget):
         ###################
 
         ##### 스크린 번호
-        self.screen_info = ["1000","2000"]
+        # 1000:계좌현황 2000:차트데이터 3000:종목별 스크린번호 4000:매매용 스크린번호
+        self.screen_info = ["1000","2000","3000","4000"]
 
         if not os.path.exists('credentials.txt'):
             print('credentials is not exists')
@@ -59,8 +60,10 @@ class Kiwoom(QAxWidget):
         self.detail_account_stocks()
         # 미체결 요청
         self.non_trading_stocks()
-        #종목 분석
-        self.analysis_stock()
+        # 종목별 스크린번호 부여
+        self.set_screen_number()
+        # 종목 분석
+        #self.analysis_stock()
 
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
@@ -70,10 +73,6 @@ class Kiwoom(QAxWidget):
         self.OnReceiveTrData.connect(self.tr_slot)
 
     def login_slot(self, errorCode):
-        if errorCode == 0:
-            print("connected")
-        else:
-            print("disconnected")
         print(errors(errorCode))
 
         self.login_event_loop.exit()
@@ -93,7 +92,6 @@ class Kiwoom(QAxWidget):
         print('%s is login , 계좌번호 %s \nserver %s connected' % (user_name,self.account_num,server_gubun))
 
     def detail_account(self):
-        print('예수금 확인')
         self.setInputValue("계좌번호", self.account_num)
         self.setInputValue("비밀번호", self.passwd)
         self.setInputValue("비밀번호입력매체구분", self.pwtype)
@@ -138,10 +136,6 @@ class Kiwoom(QAxWidget):
         '''
         code_list_kospi = self.get_code_list_by_market("0")
         code_list_kosdaq = self.get_code_list_by_market("10")
-        print("코스피 종목 갯수 %s" % len(code_list_kospi))
-        print(code_list_kospi)
-        print("코스닥 종목 갯수 %s" % len(code_list_kosdaq))
-        print(code_list_kosdaq)
         list_kospi = []
         list_kosdaq = []
 
@@ -224,6 +218,46 @@ class Kiwoom(QAxWidget):
 
         self.get_stock_data_event_loop.exec_()
 
+    def set_screen_number(self):
+        code_list = []
+
+        #계좌평가잔고내역 종목들
+        for code in self.account_stocks_detail.keys():
+            if code not in code_list:
+                code_list.append(code)
+
+        #미체결 종목
+        for order_no in self.non_trading_stocks_detail.keys():
+            code = self.non_trading_stocks_detail[order_no]['종목코드']
+            if code not in code_list:
+                code_list.append(code)
+                
+        #포트폴리오 종목
+        for code in self.portfolio_stocks_detail.keys():
+            if code not in code_list:
+                code_list.append(code)
+
+        #스크린번호 할당
+        cnt = 0
+        for code in code_list:
+            stock_screen = int(self.screen_info[2])
+            action_screen = int(self.screen_info[3])
+
+            if code not in self.portfolio_stocks_detail.keys():
+                self.portfolio_stocks_detail.update({code:{}})
+            self.portfolio_stocks_detail[code].update({"스크린번호": stock_screen})
+            self.portfolio_stocks_detail[code].update({"주문용스크린번호": action_screen})
+
+            cnt += 1
+
+            if (cnt % 50) == 0:
+                stock_screen += 1
+                action_screen += 1
+                self.screen_info[2] = str(stock_screen)
+                self.screen_info[3] = str(action_screen)
+
+        print(self.portfolio_stocks_detail)
+
 
     def tr_slot(self, sScrNo, sRQName, sTrCode, sRecordName, sPrevNext):
         '''
@@ -248,22 +282,17 @@ class Kiwoom(QAxWidget):
 
     def retDetail_account(self, sTrCode, sRQName):
         deposit = self.getCommData(sTrCode, sRQName, 0, "예수금")
-        print("예수금 %s" % int(deposit))
-
         self.use_money = int(deposit) * self.user_money_ratio
         self.use_money = self.use_money / 4
-
         candeposit = self.getCommData(sTrCode, sRQName, 0, "출금가능금액")
-        print("출금가능금액 %s" % int(candeposit))
+        print("예수금 : %s 출금가능금액 : %s" % (int(deposit), int(candeposit)))
 
         self.detail_account_event_loop.exit()
 
     def retDetail_account_stocks(self, sTrCode, sRQName, sPrevNext):
         total_portfolio_stocks = self.getCommData(sTrCode, sRQName, 0, "총매입금액")
-        print("총매입금액 %s" % int(total_portfolio_stocks))
-
         win_portfolio_rate = self.getCommData(sTrCode, sRQName, 0, "총수익률(%)")
-        print("총수익률 %s%%" % float(win_portfolio_rate))
+        print("총매입금액 : %s 총수익률 : %s%%" % (int(total_portfolio_stocks), float(win_portfolio_rate)))
 
         rows = self.getRepeatCnt(sTrCode, sRQName)
         cnt = 0
@@ -363,8 +392,6 @@ class Kiwoom(QAxWidget):
         code = self.getCommData(sTrCode, sRQName, 0, "종목코드")
         code = code.strip()
         cnt = self.getRepeatCnt(sTrCode, sRQName)
-        print("%s 일봉데이터 %s개 요청" % (code, cnt))
-
         limit = self.limits[code] + 1
         self.limits.update({code:limit})
 
