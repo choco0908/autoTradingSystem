@@ -2,9 +2,10 @@
 *.txt
 *.pyc
 *.bat
+*.conf
 DataBase/DB/stocks.db
 log/
-Bridge/
+
 chart_data/
 epoch_summary/
 logs/
