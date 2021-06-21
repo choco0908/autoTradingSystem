@@ -1,22 +1,17 @@
-import logging.config
+import logging
 from datetime import datetime
 import os
 
 class Logging():
-    def __init__(self, config_path='config/logging.conf', log_path='log'):
-        self.config_path = config_path
+    def __init__(self, log_path='log'):
         self.log_path = log_path
         if not os.path.exists(log_path):
             os.mkdir(log_path)
 
-        #logging.config.fileConfig(self.config_path)
-        self.logger = logging.getLogger('Kiwoom')
-        self.kiwoom_log()
-
-    #로그설정
-    def kiwoom_log(self):
-        fh = logging.FileHandler(self.log_path+'/{:%Y-%m-%d}.log'.format(datetime.now()), encoding="utf-8")
-        formatter = logging.Formatter('[%(asctime)s] I %(filename)s | %(name)s-%(funcName)s-%(lineno)04d I %(levelname)-8s > %(message)s')
-
-        fh.setFormatter(formatter)
-        self.logger.addHandler(fh)
+        fh = logging.FileHandler(filename=os.path.join(self.log_path, '{:%Y-%m-%d}.log'.format(datetime.now())),
+                                 encoding="utf-8")
+        format = '[%(asctime)s] I %(filename)s | %(name)s-%(funcName)s-%(lineno)04d I %(levelname)-8s > %(message)s'
+        fh.setLevel(logging.DEBUG)
+        sh = logging.StreamHandler()
+        sh.setLevel(logging.INFO)
+        logging.basicConfig(format=format, handlers=[fh,sh], level=logging.DEBUG)
