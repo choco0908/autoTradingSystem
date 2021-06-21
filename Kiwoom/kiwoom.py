@@ -106,7 +106,7 @@ class Kiwoom(QAxWidget):
             screen_no = self.portfolio_stocks_detail[code]['스크린번호']
             fid = self.realType.REALTYPE['주식체결']['체결시간']
             self.setRealReg(screen_no, code, fid, "1")
-    
+
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
 
@@ -406,32 +406,33 @@ class Kiwoom(QAxWidget):
             self.retRealData_transferred(sCode, sRealType)
 
     def retGet_stock_market_status(self, sCode, sRealType):
-        fid = self.realType.REALTYPE[sRealType]['장운영구분']
-        value = self.getCommRealData(sCode, fid)
+        value = self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['장운영구분'])
+        time = self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['시간'])
+        remain_time = self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['장시작예상잔여시간'])
 
         if value == '0':
-            print("장 시작 전")
+            print("%s %s %s전" % (time, "장 시작 ", remain_time))
         elif value == '2':
-            print("장 종료, 동시호가 시간")
+            print("%s 장 종료, 동시호가 시간" % time)
         elif value == '3':
-            if self.stock_market_isopen == False:
-                self.stock_market_isopen = True
-                print("장 시작")
+            print("%s 장 시작" % time)
         elif value == '4':
-            print("3시 30분 장 종료")
+            print("%s 3시 30분 장 종료" % time)
         elif value == '8':
-            print("장 종료")
+            print("%s 장 종료 후 DB 갱신" % time)
+            self.analysis_stock()
         elif value == '9':
-            print("장 마감")
+            print("%s 장 마감" % time)
             self.finishApplication()
 
     def retRealData_transferred(self, sCode, sRealType):
+        time = self.getCommRealData(sCode, self.realType.REALTYPE['장시작시간']['시간'])
         time_str = self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['체결시간']) # HHMMSS
         cur_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['현재가']))) # +(-) 2500
         before_ratio = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['전일대비']))) # +(-) 50
         diff_ratio = float(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['등락율'])) # +(-) 1.9
-        first_sell_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['최우선(매도호가)']))) # +(-) 2500
-        first_buy_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['최우선(매수호가)'])))  # +(-) 2500
+        first_sell_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['(최우선)매도호가']))) # +(-) 2500
+        first_buy_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['(최우선)매수호가'])))  # +(-) 2500
         tick_volume = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['거래량']))) # +(-) 10000
         all_volume = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['누적거래량'])))  # +(-) 10000
         high_price = abs(int(self.getCommRealData(sCode, self.realType.REALTYPE[sRealType]['고가'])))  # +(-) 2500
@@ -441,29 +442,27 @@ class Kiwoom(QAxWidget):
         if sCode not in self.portfolio_stocks_detail:
             self.portfolio_stocks_detail.update({sCode: {}})
 
-        self.portfolio_stocks_detail[sCode].update({"체결시간": time_str, "현재가": cur_price, "전일대비": before_ratio, "등락율": diff_ratio, "최우선(매도호가)": first_sell_price,
-                                                    "최우선(매수호가)": first_buy_price, "거래량": tick_volume, "누적거래량": all_volume, "고가": high_price,
+        self.portfolio_stocks_detail[sCode].update({"체결시간": time_str, "현재가": cur_price, "전일대비": before_ratio, "등락율": diff_ratio, "(최우선)매도호가": first_sell_price,
+                                                    "(최우선)매수호가": first_buy_price, "거래량": tick_volume, "누적거래량": all_volume, "고가": high_price,
                                                     "시가": open_price, "저가": low_price})
 
         # 장중 실시간 조건에 따라 매도 / 매수
         # print(self.portfolio_stocks_detail[sCode])
-        if self.stock_market_isopen: # 시장가로 한번 요청
-            for code, detail in self.buy_sell_stocks_detail.items():
+        # 조건에 따라 구매 요청
+        if self.stock_market_isopen == False and time == "103600": #한번 요청
+            buy_sell_trading_list = list(self.buy_sell_stocks_detail)
+            for code in buy_sell_trading_list:
+                detail = self.buy_sell_stocks_detail[code]
                 stock = self.account_stocks_detail[code]
                 max_stock_count = int(self.use_money / first_buy_price)
                 sucess = -10
                 if detail["액션"] == "BUY":
                     sucess = self.sendOrder("신규매수", self.portfolio_stocks_detail[code]['주문용스크린번호'], self.account_num, 1, code,
-                                   min(max_stock_count,detail["수량"]), 0, self.realType.SENDTYPE['거래구분']['시장가'], "")
+                                   min(max_stock_count,int(detail["수량"])), 0, self.realType.SENDTYPE['거래구분']['시장가'], "")
                 elif detail["액션"] == "SELL":
                     sucess =self.sendOrder("신규매도", self.portfolio_stocks_detail[code]['주문용스크린번호'], self.account_num, 2, code,
-                                   min(stock['매매가능수량'], detail["수량"]), 0, self.realType.SENDTYPE['거래구분']['시장가'], "")
-                if sucess == 0:
-                    print("%s:%s %s개 %s 주문 성공" % (code, detail['종목명'], detail['수량'], detail['액션']))
-                    del self.buy_sell_stocks_detail[code]
-                else:
-                    print("%s:%s %s개 %s 주문 실패" % (code, detail['종목명'], detail['수량'], detail['액션']))
-            self.stock_market_isopen = False
+                                   min(int(stock['매매가능수량']), int(detail["수량"])), 0, self.realType.SENDTYPE['거래구분']['시장가'], "")
+            self.stock_market_isopen = True
 
         non_trading_list = list(self.non_trading_stocks_detail)
         for order_no in non_trading_list:
@@ -472,9 +471,7 @@ class Kiwoom(QAxWidget):
             non_trading_count = self.non_trading_stocks_detail[order_no]["미체결수량"]
             order_gubun = self.non_trading_stocks_detail[order_no]["주문구분"]
 
-            if non_trading_count > 0:
-                print("%s %s개 %s주문 미체결" % (code, non_trading_count, order_gubun))
-            else:
+            if non_trading_count == 0:
                 del self.non_trading_stocks_detail[order_no]
 
     def chejan_slot(self, sGubun, nItemCnt, sFIdList):
@@ -504,7 +501,13 @@ class Kiwoom(QAxWidget):
                                                                   "주문수량": order_count, "주문가격": order_price, "미체결수량": non_trading_count, "원주문번호": order_no_org,
                                                                   "주문구분": order_gubun, "주문/체결시간": time_str, "체결가": action_price, "체결량": action_count,
                                                                   "현재가": current_price, "(최우선)매도호가": first_sell_price, "(최우선)매수호가": first_buy_price})
-            print(self.non_trading_stocks_detail[order_no_last])
+            if order_status == "접수":
+                print("주문 %s됨 : %s %s개 %s" % (order_status, stock_name, order_count, order_gubun))
+            elif order_status == "체결":
+                print("주문 %s됨 : %s" % (order_status, self.non_trading_stocks_detail[order_no_last]))
+                if non_trading_count == 0 and sCode in self.buy_sell_stocks_detail.keys():
+                    del self.buy_sell_stocks_detail[sCode]
+
         elif sGubun == '1': # 잔고 변경
             account_num = self.getChejanData(self.realType.REALTYPE['잔고']['계좌번호'])
             sCode = self.getChejanData(self.realType.REALTYPE['잔고']['종목코드'])[1:]
@@ -529,7 +532,7 @@ class Kiwoom(QAxWidget):
                 del self.jango_dict[sCode]
                 self.setRealRemove(self.portfolio_stocks_detail[sCode]['스크린번호'], sCode)
             else:
-                print(self.jango_dict[sCode])
+                print("잔고 변경됨 %s" % self.jango_dict[sCode])
 
     #증권사로부터 송수신 메시지 get
     def msg_slot(self, sScrNo, sRQName, sTrCode, msg):
