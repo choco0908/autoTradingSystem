@@ -47,6 +47,7 @@ class StockDB:
                 print("[%s] table creating fail" % tname)
 
     def save(self, tname, dataframe):
+        print('[+] call save %s' % tname)
         with self.conn as c:
             try:
                 cur = c.cursor()
@@ -56,10 +57,14 @@ class StockDB:
             except:
                 return None
 
-    def load(self, tname):
+    def load(self, tname, startdate=None):
+        print('[+] call load %s' % tname)
         with self.conn as c:
             try:
-                sql = "SELECT date, open, high, low, close, volume FROM \'%s\' ORDER BY date ASC" % tname
+                if startdate is not None:
+                    sql = "SELECT date, open, high, low, close, volume FROM \'%s\' WHERE date >= \'%s\' ORDER BY date DESC" % (tname, startdate)
+                else:
+                    sql = "SELECT date, open, high, low, close, volume FROM \'%s\' ORDER BY date DESC" % tname
                 df = pd.read_sql(sql, c, index_col=None)
                 return df
             except:
@@ -68,7 +73,7 @@ class StockDB:
     def createConnection(self, file):
         conn = None
         try:
-            conn = sqlite3.connect(file)
+            conn = sqlite3.connect(file,check_same_thread=False)
             return conn
         except Error as e:
             print(e)

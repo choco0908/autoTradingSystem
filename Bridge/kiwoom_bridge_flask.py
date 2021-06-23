@@ -1,22 +1,27 @@
+# flask 서버
 import sys
 import os
-
-import matplotlib.pyplot as plt
-import pandas as pd
-
+from flask import Flask,request,Response
+from multiprocessing import Process
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from flask import Flask,request,Response
-from koapy import KiwoomOpenApiPlusEntrypoint
-from pandas import Timestamp
-from config.kiwoomType import RealType
-from multiprocessing import Process
-from exchange_calendars import get_calendar
 import json
 from functools import wraps
 import mpld3
 
-# 로깅 설정
+# koapy
+from koapy import KiwoomOpenApiPlusEntrypoint
+from pandas import Timestamp
+import matplotlib.pyplot as plt
+import pandas as pd
+from exchange_calendars import get_calendar
+
+# DB
+from DataBase.SqliteDB import StockDB
+from DataBase.StockDataTaLib import StockData
+
+# Custom
+from config.kiwoomType import RealType
 from datetime import datetime
 import logging
 
@@ -31,8 +36,11 @@ sh = logging.StreamHandler()
 sh.setLevel(logging.INFO)
 logging.basicConfig(format=format, handlers=[fh, sh], level=logging.DEBUG)
 
+########### init ###########
 app = Flask(__name__)
 server = Process()
+stock_db = StockDB()
+
 # 1. 엔트리포인트 객체 생성
 entrypoint = KiwoomOpenApiPlusEntrypoint()
 
@@ -98,22 +106,59 @@ def get_basic_info(code):
 @app.route('/daily_stock_data/<code>')
 def get_daily_stock_data(code):
     parameter = request.args.to_dict()
-    if len(parameter) > 0 and 'adj' in parameter.keys():
-        adj_bool = (parameter['adj'] == 'true')
-        result = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=adj_bool)
-    else:
-        result = entrypoint.GetDailyStockDataAsDataFrame(code)
-    html = "<h1 align=\"center\">"+get_name_by_code(code)+"</h1></br></br>"
+    startdate = ''
+    if len(parameter) > 0 and 'startdate' in parameter.keys():
+        startdate = parameter['startdate']
+
+    html = "<div style=\"position: relative;\"><h1 align=\"center\">"+get_name_by_code(code)+" 종목차트</h1>"
+
     #date, open, high, low, close, volume
-    result = result[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
-    dates = pd.to_datetime(result['일자'], format='%Y%m%d')
-    closes = pd.to_numeric(result['현재가'])
+    tname = stock_db.getTableName(code)
+    if validate(startdate):
+        result = stock_db.load(tname, startdate)
+    else:
+        result = stock_db.load(tname)
+
+    if result is None:
+        return ('', 204)
+
+    df = result.iloc[::-1]
+    sd = StockData(code, df).calcIndicators()
+    sd = sd.iloc[::-1]
+    logging.debug(sd)
+
+    dates = pd.to_datetime(result['date'], format='%Y%m%d')
+    closes = pd.to_numeric(result['close'])
     f = plt.figure()
     plt.plot(dates, closes)
     html += mpld3.fig_to_html(f, figid='Stock_Chart')
     html += '</br></br>'
     html += result.to_html()
     return html
+
+@app.route('/save_daily_stock_data/<code>')
+def save_daily_stock_data(code):
+    logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
+    tname = stock_db.getTableName(code)
+    if stock_db.checkTableName(tname) == False:
+        if stock_db.createTable(tname) == False:
+            logging.debug(code+' table create failed')
+
+    parameter = request.args.to_dict()
+    if len(parameter) > 0 and 'adj' in parameter.keys():
+        adj_bool = (parameter['adj'] == 'true')
+        result = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=adj_bool)
+    else:
+        result = entrypoint.GetDailyStockDataAsDataFrame(code)
+
+    #출력값 dataframe DB 변환할 수 있도록 수정
+    result = result[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
+    columns = result['거래량'] > 0
+    result = result[columns]
+    result.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    stock_db.save(tname, result)
+
+    return ('', 204)
 
 @app.route('/order/<code>/<count>/<action>')
 def order(code, count, action):
@@ -174,6 +219,14 @@ def shutdown_server():
     if func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
     func()
+
+def validate(date_text):
+    try:
+        if date_text != datetime.strptime(date_text, "%Y%m%d").strftime('%Y%m%d'):
+            raise ValueError
+        return True
+    except ValueError:
+        return False
 
 if __name__ == '__main__':
     server = Process(target=app.run(debug=True))
