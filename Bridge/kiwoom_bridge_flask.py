@@ -1,14 +1,22 @@
+import sys
+import os
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
 from flask import Flask,request,Response
 from koapy import KiwoomOpenApiPlusEntrypoint
 from pandas import Timestamp
+from config.kiwoomType import RealType
 from multiprocessing import Process
 from exchange_calendars import get_calendar
 import json
 from functools import wraps
+import mpld3
 
 # 로깅 설정
-import os
-import sys
 from datetime import datetime
 import logging
 
@@ -79,13 +87,33 @@ def get_stock_list(kind):
     elif kind == 'kosdaq':
         return names_by_codes_dict_kosdaq
 
-@app.route('/basicinfo/<code>')
+@app.route('/basic_info/<code>')
 @as_json
 def get_basic_info(code):
     logging.info('Getting basic info of Samsung...')
     info = entrypoint.GetStockBasicInfoAsDict(code)
     logging.info('Got basic info data (using GetStockBasicInfoAsDict):')
     return info
+
+@app.route('/daily_stock_data/<code>')
+def get_daily_stock_data(code):
+    parameter = request.args.to_dict()
+    if len(parameter) > 0 and 'adj' in parameter.keys():
+        adj_bool = (parameter['adj'] == 'true')
+        result = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=adj_bool)
+    else:
+        result = entrypoint.GetDailyStockDataAsDataFrame(code)
+    html = "<h1 align=\"center\">"+get_name_by_code(code)+"</h1></br></br>"
+    #date, open, high, low, close, volume
+    result = result[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
+    dates = pd.to_datetime(result['일자'], format='%Y%m%d')
+    closes = pd.to_numeric(result['현재가'])
+    f = plt.figure()
+    plt.plot(dates, closes)
+    html += mpld3.fig_to_html(f, figid='Stock_Chart')
+    html += '</br></br>'
+    html += result.to_html()
+    return html
 
 @app.route('/order/<code>/<count>/<action>')
 def order(code, count, action):
