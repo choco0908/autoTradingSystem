@@ -2,7 +2,7 @@ import sqlite3
 from sqlite3 import Error
 import pandas as pd
 
-#COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
+#COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume']
 class StockDB:
     def __init__(self):
         self.conn = self.createConnection('DataBase/DB/stocks.db')
@@ -40,7 +40,7 @@ class StockDB:
         with self.conn as c:
             try:
                 cur = c.cursor()
-                create_sql = "CREATE TABLE %s (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT);" % tname
+                create_sql = "CREATE TABLE %s (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT, dayratio REAL, frnratio REAL, frnvolume INT, insvolume INT, manvolume INT);" % tname
                 cur.execute(create_sql)
                 return True
             except:
@@ -51,7 +51,7 @@ class StockDB:
         with self.conn as c:
             try:
                 cur = c.cursor()
-                sql = "INSERT OR REPLACE INTO \'%s\' ('date', 'open', 'high', 'low', 'close', 'volume') VALUES(?, ?, ?, ?, ?, ?)" % tname
+                sql = "INSERT OR REPLACE INTO \'%s\' ('date', 'open', 'high', 'low', 'close', 'volume', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume') VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)" % tname
                 cur.executemany(sql, dataframe.values)
                 c.commit()
             except:
@@ -65,6 +65,19 @@ class StockDB:
                     sql = "SELECT date, open, high, low, close, volume FROM \'%s\' WHERE date >= \'%s\' ORDER BY date DESC" % (tname, startdate)
                 else:
                     sql = "SELECT date, open, high, low, close, volume FROM \'%s\' ORDER BY date DESC" % tname
+                df = pd.read_sql(sql, c, index_col=None)
+                return df
+            except:
+                return None
+
+    def load_detail(self, tname, startdate=None):
+        print('[+] call load %s' % tname)
+        with self.conn as c:
+            try:
+                if startdate is not None:
+                    sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume FROM \'%s\' WHERE date >= \'%s\' ORDER BY date DESC" % (tname, startdate)
+                else:
+                    sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume FROM \'%s\' ORDER BY date DESC" % tname
                 df = pd.read_sql(sql, c, index_col=None)
                 return df
             except:

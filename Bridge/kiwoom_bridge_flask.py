@@ -10,7 +10,7 @@ from functools import wraps
 import mpld3
 
 # koapy
-from koapy import KiwoomOpenApiPlusEntrypoint
+from koapy import KiwoomOpenApiPlusEntrypoint, KiwoomOpenApiPlusTrInfo
 from pandas import Timestamp
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -52,11 +52,11 @@ logging.info('Logged in.')
 # 3. kospi/kosdaq 종목리스트 저장
 # 종목 리스트 확인 (기본 함수 호출 예시)
 logging.info('Getting stock codes and names...')
-codes = entrypoint.GetCodeListByMarketAsList('0')
+codes = entrypoint.GetKospiCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kospi = dict(zip(names, codes))
 names_by_codes_dict_kospi = dict(zip(codes, names))
-codes = entrypoint.GetCodeListByMarketAsList('10')
+codes = entrypoint.GetKosdaqCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kosdaq = dict(zip(names, codes))
 names_by_codes_dict_kosdaq = dict(zip(codes, names))
@@ -136,6 +136,28 @@ def get_daily_stock_data(code):
     html += result.to_html()
     return html
 
+@app.route('/daily_detail_stock_data/<code>')
+def get_daily_detail_stock_data(code):
+    parameter = request.args.to_dict()
+    startdate = ''
+    if len(parameter) > 0 and 'startdate' in parameter.keys():
+        startdate = parameter['startdate']
+
+    html = "<div style=\"position: relative;\"><h1 align=\"center\">"+get_name_by_code(code)+" 종목 일봉 상세차트</h1>"
+
+    # date, open, high, low, close, volume
+    tname = stock_db.getTableName(code)
+    if validate(startdate):
+        result = stock_db.load_detail(tname, startdate)
+    else:
+        result = stock_db.load_detail(tname)
+
+    if result is None:
+        return ('', 204)
+
+    html += result.to_html()
+    return html
+
 @app.route('/save_daily_stock_data/<code>')
 def save_daily_stock_data(code):
     logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
@@ -145,19 +167,34 @@ def save_daily_stock_data(code):
             logging.debug(code+' table create failed')
 
     parameter = request.args.to_dict()
-    if len(parameter) > 0 and 'adj' in parameter.keys():
-        adj_bool = (parameter['adj'] == 'true')
-        result = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=adj_bool)
+    if len(parameter) > 0 and 'enddate' in parameter.keys() and validate(parameter['enddate']):
+        enddate = parameter['enddate']
+        result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=enddate, include_end=True, adjusted_price=True)
+        result2 = detail_stock_data(code, end_date=enddate)
     else:
-        result = entrypoint.GetDailyStockDataAsDataFrame(code)
+        result1 = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=True)
+        result2 = detail_stock_data(code)
 
     #출력값 dataframe DB 변환할 수 있도록 수정
-    result = result[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
-    del_idx = result[result['거래량'] == '0'].index
-    result = result.drop(del_idx)
-    result.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
-    stock_db.save(tname, result)
+    result1 = result1[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
+    result1.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    result1 = result1.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
 
+    result2 = result2[['날짜', '등락률', '외인비중', '외인순매수', '기관순매수', '개인순매수']].dropna()
+    result2.columns = ['date', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume']
+
+    result2['frnvolume'] = result2['frnvolume'].apply(lambda _: _[1:])
+    result2['insvolume'] = result2['insvolume'].apply(lambda _: _[1:])
+    result2['manvolume'] = result2['manvolume'].apply(lambda _: _[1:])
+    result2 = result2.astype({'date': 'str', 'dayratio': 'float', 'frnratio': 'float', 'frnvolume': 'int', 'insvolume': 'int', 'manvolume': 'int'})
+
+    # 날짜 , 시가, 고가, 저가, 종가, 거래량, 등락률, 외인비중, 외인순매수, 기관순매수, 개인순매수
+    # date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume
+    result = pd.merge(result1, result2, how='inner', on='date')
+    del_idx = result[result['volume'] == 0].index
+    result = result.drop(del_idx)
+
+    stock_db.save(tname, result)
     return ('', 204)
 
 @app.route('/order/<code>/<count>/<action>')
@@ -214,6 +251,51 @@ def get_name_by_code(code):
     elif code in names_by_codes_dict_kosdaq.keys():
         return names_by_codes_dict_kosdaq[code]
 
+def detail_stock_data(code,start_date=None, end_date=None, scrno=None):
+    logging.info('Checking TR info of opt10086')
+    tr_info = KiwoomOpenApiPlusTrInfo.get_trinfo_by_code('opt10086')
+
+    print('Inputs of opt10086:\n'+str(tr_info.inputs))
+    print('Single outputs of opt10086:\n'+str(tr_info.single_outputs))
+    print('Multi outputs of opt10086:\n'+str(tr_info.multi_outputs))
+
+    rqname = "일별주가요청"
+    trcode = "opt10086"
+    inputs = {'종목코드': code, '조회일자': '', '표시구분': '0'}
+
+    date_format = "%Y%m%d"
+    date_column_name = "날짜"
+
+    if validate(start_date):
+        if start_date is not None:
+            inputs.update({'조회일자': start_date})
+
+    if validate(end_date):
+        stop_condition = {"name": date_column_name, "value": end_date, "include_equal": True,}
+    else:
+        stop_condition = None
+
+    columns = []
+    records = []
+    for response in entrypoint.TransactionCall(rqname, trcode, scrno, inputs, stop_condition=stop_condition):
+        if not columns:
+            columns = list(response.multi_data.names)
+            if date_column_name in columns:
+                date_column_index = columns.index(date_column_name)
+        for values in response.multi_data.values:
+            records.append(values.values)
+
+        nrows = len(response.multi_data.values)
+        if nrows > 0:
+            from_date = response.multi_data.values[0].values[date_column_index]
+            to_date = response.multi_data.values[-1].values[date_column_index]
+            from_date = datetime.strptime(from_date, date_format)
+            to_date = datetime.strptime(to_date, date_format)
+            logging.info("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
+
+    df = pd.DataFrame.from_records(records, columns=columns)
+    return df
+
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')
     if func is None:
@@ -221,6 +303,8 @@ def shutdown_server():
     func()
 
 def validate(date_text):
+    if date_text is None:
+        return False
     try:
         if date_text != datetime.strptime(date_text, "%Y%m%d").strftime('%Y%m%d'):
             raise ValueError
