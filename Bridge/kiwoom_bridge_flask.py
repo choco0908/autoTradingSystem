@@ -122,10 +122,9 @@ def get_daily_stock_data(code):
     if result is None:
         return ('', 204)
 
-    df = result.iloc[::-1]
-    sd = StockData(code, df).calcIndicators()
-    sd = sd.iloc[::-1]
-    logging.debug(sd)
+    #df = result.iloc[::-1]
+    #sd = StockData(code, df).calcIndicators()
+    #sd = sd.iloc[::-1]
 
     dates = pd.to_datetime(result['date'], format='%Y%m%d')
     closes = pd.to_numeric(result['close'])
@@ -133,6 +132,7 @@ def get_daily_stock_data(code):
     plt.plot(dates, closes)
     html += mpld3.fig_to_html(f, figid='Stock_Chart')
     html += '</br></br>'
+    #html += sd.to_html()
     html += result.to_html()
     return html
 
@@ -153,8 +153,8 @@ def save_daily_stock_data(code):
 
     #출력값 dataframe DB 변환할 수 있도록 수정
     result = result[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
-    columns = result['거래량'] > 0
-    result = result[columns]
+    del_idx = result[result['거래량'] == '0'].index
+    result = result.drop(del_idx)
     result.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
     stock_db.save(tname, result)
 
