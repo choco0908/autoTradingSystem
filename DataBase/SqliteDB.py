@@ -71,13 +71,23 @@ class StockDB:
                 return None
 
     def load_detail(self, tname, startdate=None):
-        print('[+] call load %s' % tname)
+        print('[+] call load detail %s' % tname)
         with self.conn as c:
             try:
                 if startdate is not None:
                     sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume FROM \'%s\' WHERE date >= \'%s\' ORDER BY date DESC" % (tname, startdate)
                 else:
                     sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume FROM \'%s\' ORDER BY date DESC" % tname
+                df = pd.read_sql(sql, c, index_col=None)
+                return df
+            except:
+                return None
+
+    def load_first(self, tname):
+        print('[+] call load first %s' % tname)
+        with self.conn as c:
+            try:
+                sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume FROM \'%s\' ORDER BY date DESC, ROWID LIMIT 1" % tname
                 df = pd.read_sql(sql, c, index_col=None)
                 return df
             except:

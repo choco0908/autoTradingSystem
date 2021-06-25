@@ -1,6 +1,8 @@
 # flask 서버
 import sys
 import os
+
+import dateutil.relativedelta
 from flask import Flask,request,Response
 from multiprocessing import Process
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -166,14 +168,15 @@ def save_daily_stock_data(code):
         if stock_db.createTable(tname) == False:
             logging.debug(code+' table create failed')
 
-    parameter = request.args.to_dict()
-    if len(parameter) > 0 and 'enddate' in parameter.keys() and validate(parameter['enddate']):
-        enddate = parameter['enddate']
-        result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=enddate, include_end=True, adjusted_price=True)
-        result2 = detail_stock_data(code, end_date=enddate)
+    date = stock_db.load_first(tname)
+    if len(date) == 0:
+        date = None
     else:
-        result1 = entrypoint.GetDailyStockDataAsDataFrame(code, adjusted_price=True)
-        result2 = detail_stock_data(code)
+        date = date['date'][0]
+    lastdate = getmaximumdate(date)
+    print('lastdate = '+lastdate)
+    result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=lastdate, include_end=True, adjusted_price=True)
+    result2 = detail_stock_data(code, end_date=lastdate, include_end=True)
 
     #출력값 dataframe DB 변환할 수 있도록 수정
     result1 = result1[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
@@ -251,7 +254,7 @@ def get_name_by_code(code):
     elif code in names_by_codes_dict_kosdaq.keys():
         return names_by_codes_dict_kosdaq[code]
 
-def detail_stock_data(code,start_date=None, end_date=None, scrno=None):
+def detail_stock_data(code,start_date=None, end_date=None, include_end=False, scrno=None):
     logging.info('Checking TR info of opt10086')
     tr_info = KiwoomOpenApiPlusTrInfo.get_trinfo_by_code('opt10086')
 
@@ -272,6 +275,8 @@ def detail_stock_data(code,start_date=None, end_date=None, scrno=None):
 
     if validate(end_date):
         stop_condition = {"name": date_column_name, "value": end_date, "include_equal": True,}
+        if include_end:
+            stop_condition["include_equal"] = True
     else:
         stop_condition = None
 
@@ -311,6 +316,18 @@ def validate(date_text):
         return True
     except ValueError:
         return False
+
+def getmaximumdate(date_text): # data 최대 10년치만 저장
+    max_date = datetime.today() + dateutil.relativedelta.relativedelta(days=-3650)
+    max_date = max_date.strftime('%Y%m%d')
+    if validate(date_text):
+        date_text = datetime.strptime(date_text, "%Y%m%d").strftime('%Y%m%d')
+        if date_text > max_date:
+            return date_text
+        else:
+            return max_date
+    else:
+        return max_date
 
 if __name__ == '__main__':
     server = Process(target=app.run(debug=True))
