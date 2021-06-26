@@ -3,15 +3,16 @@
 *.pyc
 *.bat
 *.conf
+*.log
 DataBase/DB/stocks.db
-log/
 
 chart_data/
 epoch_summary/
-logs/
-preprocessed_chart_data/
-models/
-data/
-output/
+Analysis/preprocessed_chart_data/
+Analysis/models/
+Analysis/data/
+Analysis/output/
+Kiwoom/
+UI/
 
 QuantStrategy.md

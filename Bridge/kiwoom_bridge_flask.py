@@ -89,6 +89,23 @@ def disconnect():
     shutdown_server()
     logging.info('Server shutting down...')
 
+@app.route('/myaccount', methods=['GET'])
+def myaccount():
+    sAccNo = entrypoint.GetAccountList()[0]
+    logging.info('Getting DepositInfo Data')
+    deposit = entrypoint.GetDepositInfo(account_no=sAccNo)
+    html = '<table border="1"><tr><td>예수금</td><td>출금가능금액</td></tr><tr><td>'+deposit['예수금']+'</td><td>'+deposit['출금가능금액']+'</td></tr></table>'
+    logging.info('Got DepositInfo Data (using GetDepositInfo)')
+    logging.info('Getting Account Detail Data')
+    (_, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
+    balancedetail = balancedetail[['종목번호', '종목명', '수익률(%)', '보유수량', '매매가능수량', '보유비중(%)', '매입가', '매입금액', '평가금액', '평가손익', '수수료합']]
+    logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
+
+    result = html + '</br></br>'
+    result += balancedetail.to_html()
+
+    return result
+
 @app.route('/stock_list/<kind>')
 @as_json
 def get_stock_list(kind):
@@ -100,7 +117,7 @@ def get_stock_list(kind):
 @app.route('/basic_info/<code>')
 @as_json
 def get_basic_info(code):
-    logging.info('Getting basic info of Samsung...')
+    logging.info('Getting basic info of %s', code)
     info = entrypoint.GetStockBasicInfoAsDict(code)
     logging.info('Got basic info data (using GetStockBasicInfoAsDict):')
     return info

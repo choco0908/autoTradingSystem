@@ -54,7 +54,6 @@ if __name__ == '__main__':
     logging.basicConfig(format="%(message)s", handlers=[file_handler, stream_handler], level=logging.DEBUG)
 
     # 로그, Keras Backend 설정을 먼저하고 RLTrader 모듈들을 이후에 임포트해야 함
-    from agent import Agent
     from policy_learner import ReinforcementLearner, DQNLearner, PolicyGradientLearner, ActorCriticLearner, A2CLearner, A3CLearner
 
     # 모델 경로 준비
