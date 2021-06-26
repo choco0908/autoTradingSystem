@@ -172,7 +172,9 @@ def save_daily_stock_data(code):
     if len(date) == 0:
         date = None
     else:
-        date = date['date'][0]
+        date = str(date['date'][0])
+
+    #date = str(datetime.today().strftime('%Y%m%d')) 테스트용
     lastdate = getmaximumdate(date)
     print('lastdate = '+lastdate)
     result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=lastdate, include_end=True, adjusted_price=True)
@@ -183,16 +185,17 @@ def save_daily_stock_data(code):
     result1.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
     result1 = result1.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
 
-    result2 = result2[['날짜', '등락률', '외인비중', '외인순매수', '기관순매수', '개인순매수']].dropna()
-    result2.columns = ['date', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume']
+    result2 = result2[['날짜', '등락률', '외인비중', '외인순매수', '기관순매수', '개인순매수', '프로그램']].dropna()
+    result2.columns = ['date', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume', 'autovolume']
 
-    result2['frnvolume'] = result2['frnvolume'].apply(lambda _: _[1:])
-    result2['insvolume'] = result2['insvolume'].apply(lambda _: _[1:])
-    result2['manvolume'] = result2['manvolume'].apply(lambda _: _[1:])
-    result2 = result2.astype({'date': 'str', 'dayratio': 'float', 'frnratio': 'float', 'frnvolume': 'int', 'insvolume': 'int', 'manvolume': 'int'})
+    result2['frnvolume'] = result2['frnvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['insvolume'] = result2['insvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['manvolume'] = result2['manvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['autovolume'] = result2['autovolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2 = result2.astype({'date': 'str', 'dayratio': 'float', 'frnratio': 'float', 'frnvolume': 'int', 'insvolume': 'int', 'manvolume': 'int', 'autovolume': 'int'})
 
-    # 날짜 , 시가, 고가, 저가, 종가, 거래량, 등락률, 외인비중, 외인순매수, 기관순매수, 개인순매수
-    # date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume
+    # 날짜 , 시가, 고가, 저가, 종가, 거래량, 등락률, 외인비중, 외인순매수, 기관순매수, 개인순매수, 프로그램순매수
+    # date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume, autovolume
     result = pd.merge(result1, result2, how='inner', on='date')
     del_idx = result[result['volume'] == 0].index
     result = result.drop(del_idx)
