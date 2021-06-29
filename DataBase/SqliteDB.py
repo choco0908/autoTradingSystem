@@ -36,7 +36,17 @@ class StockDB:
             except:
                 return None
 
-    def createTable(self, tname):
+    def create_table(self, tname):
+        with self.conn as c:
+            try:
+                cur = c.cursor()
+                create_sql = "CREATE TABLE %s (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT);" % tname
+                cur.execute(create_sql)
+                return True
+            except:
+                print("[%s] table creating fail" % tname)
+
+    def create_table_detail(self, tname):
         with self.conn as c:
             try:
                 cur = c.cursor()
@@ -44,10 +54,21 @@ class StockDB:
                 cur.execute(create_sql)
                 return True
             except:
-                print("[%s] table creating fail" % tname)
+                print("[%s] detail table creating fail" % tname)
 
     def save(self, tname, dataframe):
         print('[+] call save %s' % tname)
+        with self.conn as c:
+            try:
+                cur = c.cursor()
+                sql = "INSERT OR REPLACE INTO \'%s\' ('date', 'open', 'high', 'low', 'close', 'volume') VALUES(?, ?, ?, ?, ?, ?)" % tname
+                cur.executemany(sql, dataframe.values)
+                c.commit()
+            except:
+                return None
+
+    def save_detail(self, tname, dataframe):
+        print('[+] call save detail %s' % tname)
         with self.conn as c:
             try:
                 cur = c.cursor()
@@ -87,7 +108,7 @@ class StockDB:
         print('[+] call load first %s' % tname)
         with self.conn as c:
             try:
-                sql = "SELECT date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume, autovolume FROM \'%s\' ORDER BY date DESC, ROWID LIMIT 1" % tname
+                sql = "SELECT * FROM \'%s\' ORDER BY date DESC, ROWID LIMIT 1" % tname
                 df = pd.read_sql(sql, c, index_col=None)
                 return df
             except:

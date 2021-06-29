@@ -122,6 +122,32 @@ def get_basic_info(code):
     logging.info('Got basic info data (using GetStockBasicInfoAsDict):')
     return info
 
+@app.route('/index_stock_data/<name>')
+def get_index_stock_data(name):
+    # date, open, high, low, close, volume
+    save_index_stock_data(name)
+    tname = stock_db.getTableName(name)
+    result = stock_db.load(tname)
+
+    if result is None:
+        return ('', 204)
+
+    html = "<div style=\"position: relative;\"><h1 align=\"center\">"+name+"지수 차트</h1>"
+    result = result.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
+    result['open'] = result['open'].apply(lambda _: _ / 100 if _ > 0 else _)
+    result['high'] = result['high'].apply(lambda _: _ / 100 if _ > 0 else _)
+    result['low'] = result['low'].apply(lambda _: _ / 100 if _ > 0 else _)
+    result['close'] = result['close'].apply(lambda _: _ / 100 if _ > 0 else _)
+
+    dates = pd.to_datetime(result['date'], format='%Y%m%d')
+    closes = pd.to_numeric(result['close'])
+    f = plt.figure()
+    plt.plot(dates, closes)
+    html += mpld3.fig_to_html(f, figid='Index_Chart')
+    html += '</br></br>'
+    html += result.to_html()
+    return html
+
 @app.route('/daily_stock_data/<code>')
 def get_daily_stock_data(code):
     parameter = request.args.to_dict()
@@ -134,9 +160,9 @@ def get_daily_stock_data(code):
     #date, open, high, low, close, volume
     tname = stock_db.getTableName(code)
     if validate(startdate):
-        result = stock_db.load(tname, startdate)
+        result = stock_db.load_detail(tname, startdate)
     else:
-        result = stock_db.load(tname)
+        result = stock_db.load_detail(tname)
 
     if result is None:
         return ('', 204)
@@ -217,7 +243,7 @@ def save_daily_stock_data(code):
     del_idx = result[result['volume'] == 0].index
     result = result.drop(del_idx)
 
-    stock_db.save(tname, result)
+    stock_db.save_detail(tname, result)
     return ('', 204)
 
 @app.route('/order/<code>/<count>/<action>')
@@ -273,6 +299,74 @@ def get_name_by_code(code):
         return names_by_codes_dict_kospi[code]
     elif code in names_by_codes_dict_kosdaq.keys():
         return names_by_codes_dict_kosdaq[code]
+
+def save_index_stock_data(name, scrno=None):
+    #업종코드 = 001:종합(KOSPI), 002:대형주, 003:중형주, 004:소형주 101:종합(KOSDAQ), 201:KOSPI200, 302:KOSTAR, 701: KRX100 나머지 ※ 업종코드 참고
+    logging.info('Checking TR info of opt20006')
+    tr_info = KiwoomOpenApiPlusTrInfo.get_trinfo_by_code('opt20006')
+
+    print('Inputs of opt20006:\n'+str(tr_info.inputs))
+    print('Single outputs of opt20006:\n'+str(tr_info.single_outputs))
+    print('Multi outputs of opt20006:\n'+str(tr_info.multi_outputs))
+
+    rqname = "업종일봉조회요청"
+    trcode = "opt20006"
+
+    index_dict = {"kospi": "001", "big": "002", "medium": "003", "small": "004", "kosdaq": "101", "kospi200": "201",
+            "kostar": "302", "krx100": "701"}
+
+    if name in index_dict.keys():
+        code = index_dict[name]
+        logging.debug("Index Name : %s is updating..." % name)
+        tname = stock_db.getTableName(name)
+        if stock_db.checkTableName(tname) == False:
+            if stock_db.create_table(tname) == False:
+                logging.debug(code + ' table create failed')
+
+        date = stock_db.load_first(tname)
+        if len(date) == 0:
+            date = None
+        else:
+            date = str(date['date'][0])
+
+        # date = str(datetime.today().strftime('%Y%m%d')) 테스트용
+        lastdate = getmaximumdate(date)
+        print('lastdate = ' + lastdate)
+        inputs = {'업종코드': code, '기준일자': ''}
+        date_format = "%Y%m%d"
+        date_column_name = "일자"
+
+        if validate(lastdate):
+            stop_condition = {"name": date_column_name, "value": lastdate, "include_equal": True}
+        else:
+            stop_condition = None
+
+        columns = []
+        records = []
+        for response in entrypoint.TransactionCall(rqname, trcode, scrno, inputs, stop_condition=stop_condition):
+            if not columns:
+                columns = list(response.multi_data.names)
+                if date_column_name in columns:
+                    date_column_index = columns.index(date_column_name)
+            for values in response.multi_data.values:
+                records.append(values.values)
+
+            nrows = len(response.multi_data.values)
+            if nrows > 0:
+                from_date = response.multi_data.values[0].values[date_column_index]
+                to_date = response.multi_data.values[-1].values[date_column_index]
+                from_date = datetime.strptime(from_date, date_format)
+                to_date = datetime.strptime(to_date, date_format)
+                logging.info("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
+            
+        df = pd.DataFrame.from_records(records, columns=columns)
+        # date, open, high, low, close, volume
+        df = df[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
+        df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+        df = df.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
+        del_idx = df[df['volume'] == 0].index
+        df = df.drop(del_idx)
+        stock_db.save(tname, df)
 
 def detail_stock_data(code,start_date=None, end_date=None, include_end=False, scrno=None):
     logging.info('Checking TR info of opt10086')
