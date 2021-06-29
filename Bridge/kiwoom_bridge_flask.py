@@ -150,6 +150,7 @@ def get_index_stock_data(name):
 
 @app.route('/daily_stock_data/<code>')
 def get_daily_stock_data(code):
+    save_daily_stock_data(code)
     parameter = request.args.to_dict()
     startdate = ''
     if len(parameter) > 0 and 'startdate' in parameter.keys():
@@ -183,6 +184,7 @@ def get_daily_stock_data(code):
 
 @app.route('/daily_detail_stock_data/<code>')
 def get_daily_detail_stock_data(code):
+    save_daily_stock_data(code)
     parameter = request.args.to_dict()
     startdate = ''
     if len(parameter) > 0 and 'startdate' in parameter.keys():
@@ -202,49 +204,6 @@ def get_daily_detail_stock_data(code):
 
     html += result.to_html()
     return html
-
-@app.route('/save_daily_stock_data/<code>')
-def save_daily_stock_data(code):
-    logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
-    tname = stock_db.getTableName(code)
-    if stock_db.checkTableName(tname) == False:
-        if stock_db.createTable(tname) == False:
-            logging.debug(code+' table create failed')
-
-    date = stock_db.load_first(tname)
-    if len(date) == 0:
-        date = None
-    else:
-        date = str(date['date'][0])
-
-    #date = str(datetime.today().strftime('%Y%m%d')) 테스트용
-    lastdate = getmaximumdate(date)
-    print('lastdate = '+lastdate)
-    result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=lastdate, include_end=True, adjusted_price=True)
-    result2 = detail_stock_data(code, end_date=lastdate, include_end=True)
-
-    #출력값 dataframe DB 변환할 수 있도록 수정
-    result1 = result1[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
-    result1.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
-    result1 = result1.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
-
-    result2 = result2[['날짜', '등락률', '외인비중', '외인순매수', '기관순매수', '개인순매수', '프로그램']].dropna()
-    result2.columns = ['date', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume', 'autovolume']
-
-    result2['frnvolume'] = result2['frnvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
-    result2['insvolume'] = result2['insvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
-    result2['manvolume'] = result2['manvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
-    result2['autovolume'] = result2['autovolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
-    result2 = result2.astype({'date': 'str', 'dayratio': 'float', 'frnratio': 'float', 'frnvolume': 'int', 'insvolume': 'int', 'manvolume': 'int', 'autovolume': 'int'})
-
-    # 날짜 , 시가, 고가, 저가, 종가, 거래량, 등락률, 외인비중, 외인순매수, 기관순매수, 개인순매수, 프로그램순매수
-    # date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume, autovolume
-    result = pd.merge(result1, result2, how='inner', on='date')
-    del_idx = result[result['volume'] == 0].index
-    result = result.drop(del_idx)
-
-    stock_db.save_detail(tname, result)
-    return ('', 204)
 
 @app.route('/order/<code>/<count>/<action>')
 def order(code, count, action):
@@ -367,6 +326,47 @@ def save_index_stock_data(name, scrno=None):
         del_idx = df[df['volume'] == 0].index
         df = df.drop(del_idx)
         stock_db.save(tname, df)
+
+def save_daily_stock_data(code):
+    logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
+    tname = stock_db.getTableName(code)
+    if stock_db.checkTableName(tname) == False:
+        if stock_db.createTable(tname) == False:
+            logging.debug(code+' table create failed')
+
+    date = stock_db.load_first(tname)
+    if len(date) == 0:
+        date = None
+    else:
+        date = str(date['date'][0])
+
+    #date = str(datetime.today().strftime('%Y%m%d')) 테스트용
+    lastdate = getmaximumdate(date)
+    print('lastdate = '+lastdate)
+    result1 = entrypoint.GetDailyStockDataAsDataFrame(code, end_date=lastdate, include_end=True, adjusted_price=True)
+    result2 = detail_stock_data(code, end_date=lastdate, include_end=True)
+
+    #출력값 dataframe DB 변환할 수 있도록 수정
+    result1 = result1[['일자', '시가', '고가', '저가', '현재가', '거래량']].dropna()
+    result1.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    result1 = result1.astype({'date': 'str', 'open': 'int', 'high': 'int', 'low': 'int', 'close': 'int', 'volume': 'int'})
+
+    result2 = result2[['날짜', '등락률', '외인비중', '외인순매수', '기관순매수', '개인순매수', '프로그램']].dropna()
+    result2.columns = ['date', 'dayratio', 'frnratio', 'frnvolume', 'insvolume', 'manvolume', 'autovolume']
+
+    result2['frnvolume'] = result2['frnvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['insvolume'] = result2['insvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['manvolume'] = result2['manvolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2['autovolume'] = result2['autovolume'].apply(lambda _: _[1:] if len(_) > 1 else _)
+    result2 = result2.astype({'date': 'str', 'dayratio': 'float', 'frnratio': 'float', 'frnvolume': 'int', 'insvolume': 'int', 'manvolume': 'int', 'autovolume': 'int'})
+
+    # 날짜 , 시가, 고가, 저가, 종가, 거래량, 등락률, 외인비중, 외인순매수, 기관순매수, 개인순매수, 프로그램순매수
+    # date, open, high, low, close, volume, dayratio, frnratio, frnvolume, insvolume, manvolume, autovolume
+    result = pd.merge(result1, result2, how='inner', on='date')
+    del_idx = result[result['volume'] == 0].index
+    result = result.drop(del_idx)
+
+    stock_db.save_detail(tname, result)
 
 def detail_stock_data(code,start_date=None, end_date=None, include_end=False, scrno=None):
     logging.info('Checking TR info of opt10086')
