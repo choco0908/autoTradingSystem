@@ -9,7 +9,6 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
-from DataBase.StockDataTaLib import StockData
 from datetime import datetime
 
 import threading
@@ -45,7 +44,7 @@ class Visualizer:
         self.axes = None
         self.title = ''  # 그림 제목
 
-    def prepare(self, chart_data, title, code):
+    def prepare(self, chart_data, training_data, title, code):
         self.title = title
         with lock:
             # 캔버스를 초기화하고 7개의 차트를 그릴 준비
@@ -68,34 +67,13 @@ class Visualizer:
             volume = np.array(chart_data)[:, -1].tolist()
             ax.bar(x, volume, color='b', alpha=0.3)
 
-            # 지표 계산을 위해 db에서 데이터 더 불러옴
-            chart_data['date'] = pd.to_datetime(chart_data['date'])
-            start_date = chart_data['date'].min()
-            last_date = chart_data['date'].max()
-
-            result = StockData(code).calcSupportIndicators()
-            result = result.astype({'date': 'str'})
-
-            # 날짜 오름차순 정렬
-            result = result.sort_values(by='date').reset_index()
-
-            start_date = start_date.strftime('%Y%m%d')
-            last_date = last_date.strftime('%Y%m%d')
-
-            # 기간 필터링
-            result['date'] = result['date'].str.replace('-', '')
-            result = result[(result['date'] >= start_date) & (result['date'] <= last_date)]
-            result = result.dropna()
-
-            macd = np.array(result['macd'].to_list())
-            print(macd)
-            rsi = np.array(result['rsi'].to_list())
-            print(rsi)
             # 차트 5 MACD 지표
-            self.axes[ChartIndex.MACD.value].set_ylabel('MACD.')
+            macd = np.array(training_data['macd'].to_list())
+            self.axes[ChartIndex.MACD.value].set_ylabel('MACD')
             self.axes[ChartIndex.MACD.value].plot(x, macd, '-k')
             # 차트 6 RSI 지표
-            self.axes[ChartIndex.RSI.value].set_ylabel('RSI.')
+            rsi = np.array(training_data['rsi'].to_list())
+            self.axes[ChartIndex.RSI.value].set_ylabel('RSI')
             self.axes[ChartIndex.RSI.value].plot(x, rsi, '-k')
             
     
@@ -166,7 +144,7 @@ class Visualizer:
     def clear(self, xlim):
         with lock:
             _axes = self.axes.tolist()
-            for ax in _axes[ChartIndex.Agent.value:ChartIndex.PortfolioValue.value]:
+            for ax in _axes[ChartIndex.Agent.value:ChartIndex.MACD.value]: # 1-5번 차트 초기화
                 ax.cla()  # 그린 차트 지우기
                 ax.relim()  # limit를 초기화
                 ax.autoscale()  # 스케일 재설정

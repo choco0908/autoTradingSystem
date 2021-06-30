@@ -11,7 +11,6 @@ from config.kiwoomType import *
 from config.log import *
 
 from DataBase.SqliteDB import StockDB
-from DataBase.StockDataTaLib import StockData
 
 from datetime import date, timedelta
 from enum import Enum
@@ -210,9 +209,9 @@ class Kiwoom(QAxWidget):
             df = pd.DataFrame.from_dict(self.daily_stock_data[code], orient='index')
             df = df.iloc[::-1]
             logging.debug(f"index: {df.index}")
-            sd = StockData(code, df).calcIndicators()
-            sd = sd.iloc[::-1]
-            logging.debug(sd)
+            #sd = StockData(code, df).calcIndicators()
+            #sd = sd.iloc[::-1]
+            #logging.debug(sd)
             self.stock_db.save(tname, df)
 
             if idx == 1: #DB에 잘 들어가는지 테스트용

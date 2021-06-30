@@ -6,8 +6,9 @@ class Environment:
     #'date', 'open', 'high', 'low', 'close', 'volume'
     PRICE_IDX = 4 # 종가의 위치
 
-    def __init__(self, chart_data=None):
+    def __init__(self, chart_data=None, training_data=None):
         self.chart_data = chart_data
+        self.training_data = training_data
         self.observation = None
         self.idx = -1
 

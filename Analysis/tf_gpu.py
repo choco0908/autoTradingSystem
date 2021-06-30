@@ -76,13 +76,8 @@ if __name__ == '__main__':
     list_max_trading_unit = []
 
     for stock_code in args.stock_code:
-        # 전처리된 데이터 저장
-        prechartdir = os.path.join(settings.BASE_DIR, 'preprocessed_chart_data/%s' % stock_code)
-        if not os.path.isdir(prechartdir):
-            os.makedirs(prechartdir)
-        prechart_path = os.path.join(prechartdir, 'preprocessed_{}.csv'.format(stock_code))
         # 차트 데이터, 학습 데이터 준비
-        chart_data, training_data = data_manager.load_data(os.path.join(settings.BASE_DIR, 'data/{}/{}.csv'.format(args.ver, stock_code)), prechart_path, args.start_date, args.end_date, ver=args.ver)
+        chart_data, training_data = data_manager.load_data(stock_code, args.start_date, args.end_date, ver=args.ver)
 
         # 최소/최대 투자 단위 설정
         min_trading_unit = max(int(100000 / chart_data.iloc[-1]['close']), 1)

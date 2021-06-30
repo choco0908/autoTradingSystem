@@ -1,5 +1,16 @@
+# STockDataTaLib.py Merge
+import talib
+import talib.abstract as ta
+from talib import MA_Type
+
 import pandas as pd
 import numpy as np
+
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
+from DataBase.SqliteDB import StockDB
 
 COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
 
@@ -11,26 +22,10 @@ COLUMNS_TRAINING_DATA_V1 = [
     'close_ma20_ratio', 'volume_ma20_ratio',
     'close_ma60_ratio', 'volume_ma60_ratio',
     'close_ma120_ratio', 'volume_ma120_ratio',
-]
-
-COLUMNS_TRAINING_DATA_V1_RICH = [
-    'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
-    'close_lastclose_ratio', 'volume_lastvolume_ratio',
-    'close_ma5_ratio', 'volume_ma5_ratio',
-    'close_ma10_ratio', 'volume_ma10_ratio',
-    'close_ma20_ratio', 'volume_ma20_ratio',
-    'close_ma60_ratio', 'volume_ma60_ratio',
-    'close_ma120_ratio', 'volume_ma120_ratio',
-    'inst_lastinst_ratio', 'frgn_lastfrgn_ratio',
-    'inst_ma5_ratio', 'frgn_ma5_ratio',
-    'inst_ma10_ratio', 'frgn_ma10_ratio',
-    'inst_ma20_ratio', 'frgn_ma20_ratio',
-    'inst_ma60_ratio', 'frgn_ma60_ratio',
-    'inst_ma120_ratio', 'frgn_ma120_ratio',
+    'macd', 'rsi'
 ]
 
 COLUMNS_TRAINING_DATA_V2 = [
-    'per', 'pbr', 'roe',
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
     'close_lastclose_ratio', 'volume_lastvolume_ratio',
     'close_ma5_ratio', 'volume_ma5_ratio',
@@ -45,18 +40,21 @@ COLUMNS_TRAINING_DATA_V2 = [
 ]
 
 def preprocess(data, ver='v1'):
+    close_list = np.asarray(data['close'], dtype='f8')
+    volume_list = np.asarray(data['volume'], dtype='f8')
+
     windows = [5, 10, 20, 60, 120]
     for window in windows:
         data['close_ma{}'.format(window)] = data['close'].rolling(window).mean()
+        data['close_sma{}'.format(window)] = ta._ta_lib.SMA(close_list, window)
+        data['close_ema{}'.format(window)] = ta._ta_lib.EMA(close_list, window)
+        data['close_wma{}'.format(window)] = ta._ta_lib.WMA(close_list, window)
         data['volume_ma{}'.format(window)] = data['volume'].rolling(window).mean()
+        data['volume_sma{}'.format(window)] = ta._ta_lib.SMA(volume_list, window)
+        data['volume_ema{}'.format(window)] = ta._ta_lib.EMA(volume_list, window)
+        data['volume_wma{}'.format(window)] = ta._ta_lib.WMA(volume_list, window)
         data['close_ma%d_ratio' % window] = (data['close'] - data['close_ma%d' % window]) / data['close_ma%d' % window]
         data['volume_ma%d_ratio' % window] = (data['volume'] - data['volume_ma%d' % window]) / data['volume_ma%d' % window]
-
-        if ver == 'v1.rich':
-            data['inst_ma{}'.format(window)] = data['close'].rolling(window).mean()
-            data['frgn_ma{}'.format(window)] = data['volume'].rolling(window).mean()
-            data['inst_ma%d_ratio' % window] = (data['close'] - data['inst_ma%d' % window]) / data['inst_ma%d' % window]
-            data['frgn_ma%d_ratio' % window] = (data['volume'] - data['frgn_ma%d' % window]) / data['frgn_ma%d' % window]
 
     data['open_lastclose_ratio'] = np.zeros(len(data))
     data.loc[1:, 'open_lastclose_ratio'] = (data['open'][1:].values - data['close'][:-1].values) / data['close'][:-1].values
@@ -67,29 +65,33 @@ def preprocess(data, ver='v1'):
     data['volume_lastvolume_ratio'] = np.zeros(len(data))
     data.loc[1:, 'volume_lastvolume_ratio'] = (data['volume'][1:].values - data['volume'][:-1].values)/ data['volume'][:-1].replace(to_replace=0, method='ffill').replace(to_replace=0, method='bfill').values
 
-    if ver == 'v1.rich':
-        data['inst_lastinst_ratio'] = np.zeros(len(data))
-        data.loc[1:, 'inst_lastinst_ratio'] = (data['inst'][1:].values - data['inst'][:-1].values) / data['inst'][:-1].replace(to_replace=0, method='ffill').replace(to_replace=0, method='bfill').values
-        data['frgn_lastfrgn_ratio'] = np.zeros(len(data))
-        data.loc[1:, 'frgn_lastfrgn_ratio'] = (data['frgn'][1:].values - data['frgn'][:-1].values) / data['frgn'][:-1].replace(to_replace=0, method='ffill').replace(to_replace=0, method='bfill').values
+    # RSI 지표 계산
+    data['rsi'] = ta._ta_lib.RSI(close_list, 14)
+
+    # MACD 지표 계산
+    macd, macdsignal, macdhist = ta._ta_lib.MACD(close_list, 12, 26, 9)
+    data['macd'] = macd
+    data['macdsignal'] = macdsignal
+    data['macdhist'] = macdhist
 
     return data
 
-def load_data(fpath, prechart_path, date_from, date_to, ver='v2'):
-    header = None if ver == 'v1' else 0
-    data = pd.read_csv(fpath, thousands=',', header=header, converters={'date': lambda x: str(x)})
+def load_data(code, date_from, date_to, ver='v2'):
+    stock_db = StockDB()
+    tname = stock_db.getTableName(code)
+    df = stock_db.load(tname)
 
     if ver == 'v1':
-        data.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+        df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
 
     # 날짜 오름차순 정렬
-    data = data.sort_values(by='date').reset_index()
+    data = df.sort_values(by='date').reset_index()
 
     # 데이터 전처리
     data = preprocess(data)
 
     # 기간 필터링
-    data['date'] = data['date'].str.replace('-', '')
+    data = data.astype({'date': 'str'})
     data = data[(data['date'] >= date_from) & (data['date'] <= date_to)]
     data = data.dropna()
 
@@ -100,16 +102,10 @@ def load_data(fpath, prechart_path, date_from, date_to, ver='v2'):
     training_data = None
     if ver == 'v1':
         training_data = data[COLUMNS_TRAINING_DATA_V1]
-    elif ver == 'v1.rich':
-        training_data = data[COLUMNS_TRAINING_DATA_V1_RICH]
     elif ver == 'v2':
-        data.loc[:, ['per', 'pbr', 'roe']] = data[['per', 'pbr', 'roe']].apply(lambda x: x / 100)
         training_data = data[COLUMNS_TRAINING_DATA_V2]
         training_data = training_data.apply(np.tanh)
     else:
         raise Exception('Invalid version.')
-
-    # 전처리된 데이터 저장
-    training_data.to_csv(prechart_path)
 
     return chart_data, training_data

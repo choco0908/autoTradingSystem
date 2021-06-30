@@ -20,7 +20,6 @@ from exchange_calendars import get_calendar
 
 # DB
 from DataBase.SqliteDB import StockDB
-from DataBase.StockDataTaLib import StockData
 
 # Custom
 from config.kiwoomType import RealType
