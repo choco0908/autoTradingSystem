@@ -37,20 +37,20 @@ class Network:
     def __init__(self, input_dim=0, output_dim=0, lr=0.001, shared_network=None, activation='sigmoid', loss='mse'):
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.lr = lr
-        self.shared_network = shared_network
-        self.activation = activation
-        self.loss = loss
-        self.model = None
+        self.lr = lr # learning rate 신경망의 학습 속도
+        self.shared_network = shared_network # 신경망의 상단부 여러 신경망이 공유
+        self.activation = activation # 신경망의 출력 레이어 활성화 함수
+        self.loss = loss # 신경망의 손실 함수
+        self.model = None # Keras 라이브러리로 구성한 최종 신경망 모델
 
-    def predict(self, sample):
+    def predict(self, sample): # 샘플에 대한 행동의 가치/확률 예측
         with self.lock:
             with graph.as_default():
                 if sess is not None:
                     set_session(sess)
                 return self.model.predict(sample).flatten()
 
-    def train_on_batch(self, x, y):
+    def train_on_batch(self, x, y): # 학습 데이터와 레이블을 받아 모델을 학습
         loss = 0.
         with self.lock:
             with graph.as_default():

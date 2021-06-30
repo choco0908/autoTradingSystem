@@ -3,6 +3,7 @@
 #idx: 차트 데이터에서의 현재 위치
 
 class Environment:
+    #'date', 'open', 'high', 'low', 'close', 'volume'
     PRICE_IDX = 4 # 종가의 위치
 
     def __init__(self, chart_data=None):

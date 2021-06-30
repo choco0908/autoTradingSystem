@@ -6,6 +6,12 @@ import dataframe
 import pandas as pd
 import numpy as np
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
+from DataBase.SqliteDB import StockDB
+
 COLUMNS_TRAINING_DATA_V2 = [
     'per', 'pbr', 'roe',
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
@@ -22,11 +28,16 @@ COLUMNS_TRAINING_DATA_V2 = [
 ]
 
 class StockData:
-    def __init__(self, code, dataframe):
+    def __init__(self, code):
         self.code = code
-        self.dataframe = dataframe
+        self.stock_db = StockDB()
+        tname = self.stock_db.getTableName(code)
+        self.dataframe = self.stock_db.load(tname)
 
     def calcIndicators(self):
+        if self.dataframe is None:
+            return None
+        self.dataframe = self.dataframe.iloc[::-1]
         close_list = np.asarray(self.dataframe["close"], dtype='f8')
         volume_list = np.asarray(self.dataframe["volume"], dtype='f8')
 
@@ -67,4 +78,23 @@ class StockData:
         self.dataframe["volume_wma60"] = ta._ta_lib.WMA(volume_list, 60)
         self.dataframe["volume_wma120"] = ta._ta_lib.WMA(volume_list, 120)
 
+        self.dataframe = self.dataframe.iloc[::-1]
+        return self.dataframe
+
+    def calcSupportIndicators(self):
+        if self.dataframe is None:
+            return None
+        self.dataframe = self.dataframe.iloc[::-1]
+        close_list = np.asarray(self.dataframe["close"], dtype='f8')
+
+        # RSI 지표 계산
+        self.dataframe["rsi"] = ta._ta_lib.RSI(close_list, 14)
+
+        # MACD 지표 계산
+        macd, macdsignal, macdhist = ta._ta_lib.MACD(close_list, 12, 26, 9)
+        self.dataframe["macd"] = macd
+        self.dataframe["macdsignal"] = macdsignal
+        self.dataframe["macdhist"] = macdhist
+
+        self.dataframe = self.dataframe.iloc[::-1]
         return self.dataframe

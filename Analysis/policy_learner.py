@@ -177,7 +177,7 @@ class ReinforcementLearner:
 
         # 가시화 준비
         # 차트 데이터는 변하지 않으므로 미리 가시화
-        self.visualizer.prepare(self.environment.chart_data, info)
+        self.visualizer.prepare(self.environment.chart_data, info, self.stock_code)
 
         # 가시화 결과 저장할 폴더 준비
         self.epoch_summary_dir = os.path.join(self.output_path, 'epoch_summary_{}'.format(self.stock_code))

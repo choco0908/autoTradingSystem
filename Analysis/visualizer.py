@@ -5,10 +5,18 @@
 # Axes 2: 보유 주식 수 및 에이전트 행동 차트
 # Axes 3: 정책 신경망 출력 및 탐험 차트
 # Axes 4: 포트폴리오 가치 차트
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
+from DataBase.StockDataTaLib import StockData
+from datetime import datetime
 
 import threading
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+
 plt.switch_backend('agg')
 
 from mplfinance.original_flavor import candlestick_ohlc
@@ -21,6 +29,8 @@ class ChartIndex(Enum):
     Value = 2
     Policy = 3
     PortfolioValue = 4
+    MACD = 5
+    RSI = 6
 
 lock = threading.Lock()
 
@@ -35,11 +45,11 @@ class Visualizer:
         self.axes = None
         self.title = ''  # 그림 제목
 
-    def prepare(self, chart_data, title):
+    def prepare(self, chart_data, title, code):
         self.title = title
         with lock:
-            # 캔버스를 초기화하고 5개의 차트를 그릴 준비
-            self.fig, self.axes = plt.subplots(nrows=5, ncols=1, facecolor='w', sharex=True)
+            # 캔버스를 초기화하고 7개의 차트를 그릴 준비
+            self.fig, self.axes = plt.subplots(nrows=7, ncols=1, facecolor='w', sharex=True)
             for ax in self.axes:
                 # 보기 어려운 과학적 표기 비활성화
                 ax.get_xaxis().get_major_formatter().set_scientific(False)
@@ -58,6 +68,37 @@ class Visualizer:
             volume = np.array(chart_data)[:, -1].tolist()
             ax.bar(x, volume, color='b', alpha=0.3)
 
+            # 지표 계산을 위해 db에서 데이터 더 불러옴
+            chart_data['date'] = pd.to_datetime(chart_data['date'])
+            start_date = chart_data['date'].min()
+            last_date = chart_data['date'].max()
+
+            result = StockData(code).calcSupportIndicators()
+            result = result.astype({'date': 'str'})
+
+            # 날짜 오름차순 정렬
+            result = result.sort_values(by='date').reset_index()
+
+            start_date = start_date.strftime('%Y%m%d')
+            last_date = last_date.strftime('%Y%m%d')
+
+            # 기간 필터링
+            result['date'] = result['date'].str.replace('-', '')
+            result = result[(result['date'] >= start_date) & (result['date'] <= last_date)]
+            result = result.dropna()
+
+            macd = np.array(result['macd'].to_list())
+            print(macd)
+            rsi = np.array(result['rsi'].to_list())
+            print(rsi)
+            # 차트 5 MACD 지표
+            self.axes[ChartIndex.MACD.value].set_ylabel('MACD.')
+            self.axes[ChartIndex.MACD.value].plot(x, macd, '-k')
+            # 차트 6 RSI 지표
+            self.axes[ChartIndex.RSI.value].set_ylabel('RSI.')
+            self.axes[ChartIndex.RSI.value].plot(x, rsi, '-k')
+            
+    
     def plot(self, epoch_str=None, num_epoches=None, epsilon=None, action_list=None, actions=None, num_stocks=None, outvals_value=[], outvals_policy=[], exps=None, learning_idxes=None, initial_balance=None, pvs=None):
         with lock:
             x = np.arange(len(actions))  # 모든 차트가 공유할 x축 데이터
@@ -125,7 +166,7 @@ class Visualizer:
     def clear(self, xlim):
         with lock:
             _axes = self.axes.tolist()
-            for ax in _axes[1:]:
+            for ax in _axes[ChartIndex.Agent.value:ChartIndex.PortfolioValue.value]:
                 ax.cla()  # 그린 차트 지우기
                 ax.relim()  # limit를 초기화
                 ax.autoscale()  # 스케일 재설정

@@ -44,7 +44,7 @@ class Agent:
         self.immediate_reward = 0  # 즉시 보상
         self.profitloss = 0  # 현재 손익
         self.base_profitloss = 0  # 직전 지연 보상 이후 손익
-        self.exploration_base = 0  # 탐험 행동 결정 기준
+        self.exploration_base = 0  # 탐험 행동 결정 기준 탐험을 하더라도 매수/매도 기조 결정
 
         #Agent 클래스의 상태
         self.ratio_hold = 0 # 주식 보유 비율
@@ -77,8 +77,6 @@ class Agent:
         return (self.ratio_hold, self.ratio_portfolio_value)
 
     def decide_action(self, pred_value, pred_policy, epsilon):
-        confidence = 0.
-
         pred = pred_policy
         if pred is None:
             pred = pred_value
@@ -95,18 +93,18 @@ class Agent:
         # 탐험 결정
         if np.random.rand() < epsilon:
             exploration = True
-            if np.random.rand() < self.exploration_base:
+            if np.random.rand() < self.exploration_base: # 매수 기조
                 action = self.ACTION_BUY
             else:
-                action = np.random.randint(self.NUM_ACTIONS - 1) + 1
+                action = np.random.randint(self.NUM_ACTIONS - 1) + 1 # 매수/매도 랜덤 선택
         else:
             exploration = False
             action = np.argmax(pred)
 
         confidence = .5
-        if pred_policy is not None:
+        if pred_policy is not None: # 정책 신경망 값이 있는경우
             confidence = pred[action]
-        elif pred_value is not None:
+        elif pred_value is not None: # 가치 신경망 값이 있는경우 (DQN)
             confidence = utils.sigmoid(pred[action])
 
         return action, confidence, exploration
@@ -123,7 +121,7 @@ class Agent:
                 validity = False
         return validity
 
-    def decide_trading_unit(self, confidence):
+    def decide_trading_unit(self, confidence): # 정책신경망 값이 높을수록 매매 단위 설정 크게 만듬
         if np.isnan(confidence):
             return self.min_trading_unit
         added_trading = max(min(int(confidence * (self.max_trading_unit - self.min_trading_unit)) , self.max_trading_unit - self.min_trading_unit) , 0)
@@ -144,7 +142,7 @@ class Agent:
             # 매수할 단위를 판단
             trading_unit = self.decide_trading_unit(confidence)
             balance = self.balance - curr_price * (1 + self.TRADING_CHARGE) * trading_unit
-            # 보유 현금이 모자랑 경우 보유 현금으로 가능한 만큼 최대한 매수
+            # 강한 매수 신호 일때 보유 현금이 모자랑 경우 보유 현금으로 가능한 만큼 최대한 매수
             if balance < 0 :
                 trading_unit = max(min(int(self.balance / (curr_price * (1 + self.TRADING_CHARGE))) , self.max_trading_unit) , self.min_trading_unit)
 
@@ -158,7 +156,7 @@ class Agent:
         elif action == Agent.ACTION_SELL:
             # 매도할 단위를 판단
             trading_unit = self.decide_trading_unit(confidence)
-            # 보유 주식이 모자랄 경우 가능한 만큼 최대한 매도
+            # 강한 매도 신호 일때 보유 주식이 모자랄 경우 가능한 만큼 최대한 매도
             trading_unit = min(trading_unit, self.num_stocks)
             # 매도
             invest_amount = curr_price * (1 - (self.TRADING_TAX + self.TRADING_CHARGE)) * trading_unit
@@ -171,7 +169,7 @@ class Agent:
             self.num_hold += 1 # 관망 횟수 증가
 
         # 포트폴리오 가치 갱신
-        self.portfolio_value = self.balance + curr_price * self.num_stocks
+        self.portfolio_value = self.balance + curr_price * self.num_stocks #현금 + 현재가*주식수
         self.profitloss = ((self.portfolio_value - self.initial_balance) / self.initial_balance)
 
         # 즉시 보상 판단
