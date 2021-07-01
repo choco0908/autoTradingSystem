@@ -17,7 +17,7 @@ class ReinforcementLearner:
     lock = threading.Lock()
 
     def __init__(self, rl_method='rl', stock_code=None, chart_data=None, training_data=None, min_trading_unit=1, max_trading_unit=2, delayed_reward_threshold=.05, net='dnn', num_steps=1, lr=0.001,
-                 value_network=None, policy_network=None, output_path='', reuse_models=True):
+                 value_network=None, policy_network=None, output_path='', reuse_models=True, base_num_stocks=0):
         # 인자 확인
         assert min_trading_unit > 0
         assert max_trading_unit > 0
@@ -31,7 +31,7 @@ class ReinforcementLearner:
         self.chart_data = chart_data
         self.environment = Environment(chart_data, training_data)
         # 에이전트 설정
-        self.agent = Agent(self.environment, min_trading_unit=min_trading_unit, max_trading_unit=max_trading_unit, delayed_reward_threshold=delayed_reward_threshold)
+        self.agent = Agent(self.environment, min_trading_unit=min_trading_unit, max_trading_unit=max_trading_unit, delayed_reward_threshold=delayed_reward_threshold, base_num_stocks=base_num_stocks)
         # 학습을 위해 전처리된 데이터
         self.training_data = training_data
         self.sample = None
@@ -284,7 +284,7 @@ class ReinforcementLearner:
                 self.stock_code, epoch_str, num_epoches, epsilon, self.exploration_cnt, self.itr_cnt, self.agent.num_buy, self.agent.num_sell,
                 self.agent.num_hold, self.agent.num_stocks, self.agent.portfolio_value, self.learning_cnt, self.loss, elapsed_time_epoch))
             # 종목코드 , 현재 에포크 번호, 에포크당 탐험률, 매수 횟수, 매도 횟수, 관망 횟수, 보유 주식 수, 최종 포트폴리오 가치, 미니 배치 학습 횟수, 학습 손실, 에포크 소요 시간(초)
-            
+            # Loss : 정책 신경망 배치 학습에서 발생한 손실의 평균 (학습 데이터 레이블과 신경망의 예측 값의 차이)
             # 에포크 관련 정보 가시화
             self.visualize(epoch_str, num_epoches, epsilon)
 

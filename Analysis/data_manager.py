@@ -22,7 +22,7 @@ COLUMNS_TRAINING_DATA_V1 = [
     'close_ma20_ratio', 'volume_ma20_ratio',
     'close_ma60_ratio', 'volume_ma60_ratio',
     'close_ma120_ratio', 'volume_ma120_ratio',
-    'macd', 'rsi'
+    'rsi', 'macd', 'macdsignal', 'macdhist'
 ]
 
 COLUMNS_TRAINING_DATA_V2 = [
@@ -44,7 +44,7 @@ def preprocess(data, ver='v1'):
     volume_list = np.asarray(data['volume'], dtype='f8')
 
     windows = [5, 10, 20, 60, 120]
-    for window in windows:
+    for window in windows: # 과거 데이터와 현재 데이터의 수 차이가 크기 때문에 비율로 처리
         data['close_ma{}'.format(window)] = data['close'].rolling(window).mean()
         data['close_sma{}'.format(window)] = ta._ta_lib.SMA(close_list, window)
         data['close_ema{}'.format(window)] = ta._ta_lib.EMA(close_list, window)
@@ -55,6 +55,8 @@ def preprocess(data, ver='v1'):
         data['volume_wma{}'.format(window)] = ta._ta_lib.WMA(volume_list, window)
         data['close_ma%d_ratio' % window] = (data['close'] - data['close_ma%d' % window]) / data['close_ma%d' % window]
         data['volume_ma%d_ratio' % window] = (data['volume'] - data['volume_ma%d' % window]) / data['volume_ma%d' % window]
+
+    # 이동 평균 종가 비율 : (현재 종가 - 이동평균값)/이동평균값
 
     data['open_lastclose_ratio'] = np.zeros(len(data))
     data.loc[1:, 'open_lastclose_ratio'] = (data['open'][1:].values - data['close'][:-1].values) / data['close'][:-1].values

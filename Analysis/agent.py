@@ -22,7 +22,7 @@ class Agent:
     NUM_ACTIONS = len(ACTIONS) # 인공 신경망에서 고려할 출력값의 개수
 
 
-    def __init__(self, environment, min_trading_unit = 1, max_trading_unit = 2, delayed_reward_threshold = .05):
+    def __init__(self, environment, min_trading_unit = 1, max_trading_unit = 2, delayed_reward_threshold = .05 , base_num_stocks = 0):
         # Environment 객체
         self.environment = environment # 현재 주식 가격을 가져오기 위해 환경 참조
 
@@ -34,7 +34,8 @@ class Agent:
         # Agent 클래스의 속성
         self.initial_balance = 0  # 초기 자본금
         self.balance = 0  # 현재 현금 잔고
-        self.num_stocks = 0  # 보유 주식 수
+        self.base_num_stocks = base_num_stocks
+        self.num_stocks = base_num_stocks  # 보유 주식 수
         # 포트폴리오 가치: balance + num_stocks * {현재 주식 가격}
         self.portfolio_value = 0
         self.base_portfolio_value = 0  # 직전 학습 시점의 PV
@@ -53,7 +54,7 @@ class Agent:
 
     def reset(self):
         self.balance = self.initial_balance
-        self.num_stocks = 0
+        self.num_stocks = self.base_num_stocks
         self.portfolio_value = self.initial_balance
         self.base_portfolio_value = self.initial_balance
         self.num_buy = 0
@@ -152,6 +153,7 @@ class Agent:
                 self.balance -= invest_amount  # 보유 현금을 갱신
                 self.num_stocks += trading_unit  # 보유 주식 수를 갱신
                 self.num_buy += 1  # 매수 횟수 증가
+                print('buy:', str(trading_unit), ' total: ', self.num_stocks)
         # 매도
         elif action == Agent.ACTION_SELL:
             # 매도할 단위를 판단
@@ -164,6 +166,7 @@ class Agent:
                 self.num_stocks -= trading_unit  # 보유 주식 수를 갱신
                 self.balance += invest_amount  # 보유 현금을 갱신
                 self.num_sell += 1  # 매도 횟수 증가
+                print('sell:', str(trading_unit), ' total: ', self.num_stocks)
         #관망
         elif action == Agent.ACTION_HOLD:
             self.num_hold += 1 # 관망 횟수 증가

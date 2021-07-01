@@ -69,13 +69,17 @@ class Visualizer:
 
             # 차트 5 MACD 지표
             macd = np.array(training_data['macd'].to_list())
+            macdsignal = np.array(training_data['macdsignal'].to_list())
+            macdhist = np.array(training_data['macdhist'].to_list())
             self.axes[ChartIndex.MACD.value].set_ylabel('MACD')
-            self.axes[ChartIndex.MACD.value].plot(x, macd, '-k')
+            self.axes[ChartIndex.MACD.value].plot(x, macd, color='limegreen', linestyle='-')
+            self.axes[ChartIndex.MACD.value].plot(x, macdsignal, color='violet', linestyle='-')
+            self.axes[ChartIndex.MACD.value].plot(x, macdhist, color='dodgerblue', linestyle='-')
+
             # 차트 6 RSI 지표
             rsi = np.array(training_data['rsi'].to_list())
             self.axes[ChartIndex.RSI.value].set_ylabel('RSI')
-            self.axes[ChartIndex.RSI.value].plot(x, rsi, '-k')
-            
+            self.axes[ChartIndex.RSI.value].plot(x, rsi, color='orange', linestyle='-')
     
     def plot(self, epoch_str=None, num_epoches=None, epsilon=None, action_list=None, actions=None, num_stocks=None, outvals_value=[], outvals_policy=[], exps=None, learning_idxes=None, initial_balance=None, pvs=None):
         with lock:

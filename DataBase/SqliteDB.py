@@ -7,21 +7,50 @@ class StockDB:
     def __init__(self):
         self.conn = self.createConnection('DataBase/DB/stocks.db')
 
+    def create_account_table(self):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            create_sql = "CREATE TABLE account_info (accountno TEXT PRIMARY KEY, balance INTEGER, cash INTEGER);" # accoutno: 계좌번호, balance: 예수금, cash: 출금가능금액
+            cur.execute(create_sql)
+            return True
+        except:
+            print("account_info table creating fail")
+
+    def save_account_table(self, dataframe):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            sql = "INSERT OR REPLACE INTO account_info ('accountno', 'balance', 'cash') VALUES(?, ?, ?)"
+            cur.executemany(sql, dataframe.values)
+            c.commit()
+        except:
+            return None
+
+    def load_account_table(self, accno):
+        c = self.conn
+        try:
+            sql = "SELECT accountno, balance FROM account_info WHERE accountno == \'%s\'" % accno
+            df = pd.read_sql(sql, c, index_col=None)
+            return df
+        except:
+            return None
+
     def createBasicInfoTable(self):
         c = self.conn
         try:
             cur = c.cursor()
-            create_sql = "CREATE TABLE stock_basic_info (code TEXT PRIMARY KEY, name TEXT, maketcap INTEGER, per REAL, eps REAL, roe REAL, pbr REAL, multiple REAL);"
+            create_sql = "CREATE TABLE stock_basicinfo (code TEXT PRIMARY KEY, name TEXT, maketcap INTEGER, per REAL, eps REAL, roe REAL, pbr REAL, multiple REAL);"
             cur.execute(create_sql)
             return True
         except:
-            print("basic_info table creating fail")
+            print("stock_basicinfo table creating fail")
 
     def saveBasicInfoTable(self, dataframe):
         c = self.conn
         try:
             cur = c.cursor()
-            sql = "INSERT OR REPLACE INTO stock_basic_info ('code', 'name', 'maketcap', 'per', 'eps', 'roe', 'pbr', 'multiple') VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
+            sql = "INSERT OR REPLACE INTO stock_basicinfo ('code', 'name', 'maketcap', 'per', 'eps', 'roe', 'pbr', 'multiple') VALUES(?, ?, ?, ?, ?, ?, ?, ?)"
             cur.executemany(sql, dataframe.values)
             c.commit()
         except:
@@ -30,7 +59,37 @@ class StockDB:
     def loadBasicInfoTable(self):
         c = self.conn
         try:
-            sql = "SELECT code, name, maketcap, per, eps, roe, pbr, multiple FROM stock_basic_info"
+            sql = "SELECT code, name, maketcap, per, eps, roe, pbr, multiple FROM stock_basicinfo"
+            df = pd.read_sql(sql, c, index_col=None)
+            return df
+        except:
+            return None
+
+    def create_account_detail_table(self, tname):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            create_sql = "CREATE TABLE \'%s\' (code TEXT PRIMARY KEY, name TEXT, count INTEGER, tradecount INTEGER, winratio REAL, havratio REAL);" % tname
+            cur.execute(create_sql)
+            return True
+        except:
+            print("[%s] table creating fail" % tname)
+
+    def save_account_detail_table(self, tname, dataframe):
+        print('[+] call save %s' % tname)
+        c = self.conn
+        try:
+            cur = c.cursor()
+            sql = "INSERT OR REPLACE INTO \'%s\' ('code', 'name', 'count', 'tradecount', 'winratio', 'havratio') VALUES(?, ?, ?, ?, ?, ?)" % tname
+            cur.executemany(sql, dataframe.values)
+            c.commit()
+        except:
+            return None
+
+    def load_account_detail_table(self, tname):
+        c = self.conn
+        try:
+            sql = "SELECT code, name, tradecount FROM \'%s\'" % tname
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:
@@ -40,7 +99,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            create_sql = "CREATE TABLE %s (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT);" % tname
+            create_sql = "CREATE TABLE \'%s\' (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT);" % tname
             cur.execute(create_sql)
             return True
         except:
@@ -50,7 +109,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            create_sql = "CREATE TABLE %s (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT, dayratio REAL, frnratio REAL, frnvolume INT, insvolume INT, manvolume INT, autovolume INT);" % tname
+            create_sql = "CREATE TABLE \'%s\' (date DATETIME PRIMARY KEY, open INT, high INT, low INT, close INT, volume INT, dayratio REAL, frnratio REAL, frnvolume INT, insvolume INT, manvolume INT, autovolume INT);" % tname
             cur.execute(create_sql)
             return True
         except:

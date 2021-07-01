@@ -1,5 +1,8 @@
 import os
 import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
+
+from DataBase.SqliteDB import StockDB # account 정보 조회
 import logging
 import argparse
 import json
@@ -10,25 +13,26 @@ import data_manager
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stock_code', nargs='+')
-    parser.add_argument('--ver', choices=['v1', 'v2'], default='v2')
-    parser.add_argument('--rl_method', choices=['dqn', 'pg', 'ac', 'a2c', 'a3c', 'monkey'])
-    parser.add_argument('--net', choices=['dnn', 'lstm', 'cnn', 'monkey'], default='dnn')
-    parser.add_argument('--num_steps', type=int, default=1)
-    parser.add_argument('--lr', type=float, default=0.01)
-    parser.add_argument('--discount_factor', type=float, default=0.9)
-    parser.add_argument('--start_epsilon', type=float, default=0)
-    parser.add_argument('--balance', type=int, default=10000000)
-    parser.add_argument('--num_epoches', type=int, default=100)
-    parser.add_argument('--delayed_reward_threshold', type=float, default=0.05)
-    parser.add_argument('--backend', choices=['tensorflow', 'plaidml'], default='tensorflow')
+    parser.add_argument('--stock_code', nargs='+') # 종목 코드
+    parser.add_argument('--ver', choices=['v1', 'v2'], default='v2') # 사용할 데이터 버전
+    parser.add_argument('--rl_method', choices=['dqn', 'pg', 'ac', 'a2c', 'a3c', 'monkey']) # 강화학습 방식
+    parser.add_argument('--net', choices=['dnn', 'lstm', 'cnn', 'monkey'], default='dnn') # 가치/정책 신경망에서 사용할 신경망 유형
+    parser.add_argument('--num_steps', type=int, default=1) # lstm/cnn 에서 사용할 step 수
+    parser.add_argument('--lr', type=float, default=0.01) # 학습 속도
+    parser.add_argument('--discount_factor', type=float, default=0.9) # 이전 행동에 대한 할인율
+    parser.add_argument('--start_epsilon', type=float, default=0) # 시작 탐험률
+    parser.add_argument('--balance', type=int, default=10000000) # 초기 자본금
+    parser.add_argument('--num_epoches', type=int, default=100) # 수행할 에포크 수
+    parser.add_argument('--delayed_reward_threshold', type=float, default=0.05) # 지연 보상의 임곗값
+    parser.add_argument('--backend', choices=['tensorflow', 'plaidml'], default='tensorflow') # keras 백엔드
     parser.add_argument('--output_name', default=utils.get_time_str())
     parser.add_argument('--value_network_name')
     parser.add_argument('--policy_network_name')
-    parser.add_argument('--reuse_models', action='store_true')
-    parser.add_argument('--learning', action='store_true')
+    parser.add_argument('--reuse_models', action='store_true') # 신경망 재사용 유무
+    parser.add_argument('--learning', action='store_true') # 강화학습 유무
     parser.add_argument('--start_date', default='20170101')
     parser.add_argument('--end_date', default='20171231')
+    parser.add_argument('--base_num_stocks', type=int, default=0)
     args = parser.parse_args()
 
     # Keras Backend 설정
@@ -75,6 +79,9 @@ if __name__ == '__main__':
     list_min_trading_unit = []
     list_max_trading_unit = []
 
+    if args.reuse_models:
+        stock_db = StockDB()
+
     for stock_code in args.stock_code:
         # 차트 데이터, 학습 데이터 준비
         chart_data, training_data = data_manager.load_data(stock_code, args.start_date, args.end_date, ver=args.ver)
@@ -84,7 +91,9 @@ if __name__ == '__main__':
         max_trading_unit = max(int(1000000 / chart_data.iloc[-1]['close']), 1)
 
         # 공통 파라미터 설정
-        common_params = {'rl_method': args.rl_method, 'delayed_reward_threshold': args.delayed_reward_threshold, 'net': args.net, 'num_steps': args.num_steps, 'lr': args.lr, 'output_path': output_path, 'reuse_models': args.reuse_models}
+        common_params = {'rl_method': args.rl_method, 'delayed_reward_threshold': args.delayed_reward_threshold,
+                         'net': args.net, 'num_steps': args.num_steps, 'lr': args.lr, 'output_path': output_path,
+                         'reuse_models': args.reuse_models, 'base_num_stocks': args.base_num_stocks}
 
         # 강화학습 시작
         learner = None

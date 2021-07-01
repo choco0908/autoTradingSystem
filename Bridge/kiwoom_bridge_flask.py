@@ -90,19 +90,15 @@ def disconnect():
 
 @app.route('/myaccount', methods=['GET'])
 def myaccount():
+    save_account_info()
+
     sAccNo = entrypoint.GetAccountList()[0]
-    logging.info('Getting DepositInfo Data')
-    deposit = entrypoint.GetDepositInfo(account_no=sAccNo)
-    html = '<table border="1"><tr><td>예수금</td><td>출금가능금액</td></tr><tr><td>'+deposit['예수금']+'</td><td>'+deposit['출금가능금액']+'</td></tr></table>'
-    logging.info('Got DepositInfo Data (using GetDepositInfo)')
-    logging.info('Getting Account Detail Data')
-    (_, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
-    balancedetail = balancedetail[['종목번호', '종목명', '수익률(%)', '보유수량', '매매가능수량', '보유비중(%)', '매입가', '매입금액', '평가금액', '평가손익', '수수료합']]
-    logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
-
-    result = html + '</br></br>'
-    result += balancedetail.to_html()
-
+    account = stock_db.load_account_table(sAccNo).to_html()
+    tname = 'account_detail_{}'.format(sAccNo)
+    account_detail = stock_db.load_account_detail_table(tname)
+    result = account + '</br></br>'
+    result += account_detail.to_html()
+    
     return result
 
 @app.route('/stock_list/<kind>')
@@ -275,6 +271,44 @@ def get_name_by_code(code):
     elif code in names_by_codes_dict_kosdaq.keys():
         return names_by_codes_dict_kosdaq[code]
 
+def save_account_info():
+    logging.debug("Account is updating...")
+    actname = 'account_info'
+    if stock_db.checkTableName(actname) == False:
+        if stock_db.create_account_table() == False:
+            logging.debug('Account table create failed')
+
+    df = pd.DataFrame(columns=['예수금', '출금가능금액'])
+
+    sAccNo_list = entrypoint.GetAccountList()
+    logging.info('Getting DepositInfo Data')
+    for sAccNo in sAccNo_list:
+        deposit = entrypoint.GetDepositInfo(account_no=sAccNo)
+        record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액']}], columns=['예수금', '출금가능금액'])
+        df = df.append(record, ignore_index=True)
+
+        logging.info('Got DepositInfo Data (using GetDepositInfo)')
+        logging.info('Getting Account Detail Data')
+
+        tname = 'account_detail_{}'.format(sAccNo)
+        if stock_db.checkTableName(tname) == False:
+            if stock_db.create_account_detail_table(tname) == False:
+                logging.debug('account_detail_{} table create failed'.format(sAccNo))
+
+        (_, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
+        balancedetail = balancedetail[
+            ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)']]
+        logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
+        balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio']
+        balancedetail = balancedetail.astype({'code': 'str', 'name': 'str', 'count': 'int', 'tradecount': 'int', 'winratio': 'float', 'havratio': 'float'})
+        balancedetail['code'] = balancedetail['code'].apply(lambda _: _[1:]) # 종목코드 A 제거
+        stock_db.save_account_detail_table(tname, balancedetail)
+
+    df['계좌번호'] = pd.Series(sAccNo_list)
+    df.columns = ['balance', 'cash', 'accountno']
+    df = df[['accountno', 'balance', 'cash']]
+    stock_db.save_account_table(df)
+
 def save_index_stock_data(name, scrno=None):
     #업종코드 = 001:종합(KOSPI), 002:대형주, 003:중형주, 004:소형주 101:종합(KOSDAQ), 201:KOSPI200, 302:KOSTAR, 701: KRX100 나머지 ※ 업종코드 참고
     logging.info('Checking TR info of opt20006')
@@ -347,7 +381,7 @@ def save_daily_stock_data(code):
     logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
     tname = stock_db.getTableName(code)
     if stock_db.checkTableName(tname) == False:
-        if stock_db.createTable(tname) == False:
+        if stock_db.create_table(tname) == False:
             logging.debug(code+' table create failed')
 
     date = stock_db.load_first(tname)
