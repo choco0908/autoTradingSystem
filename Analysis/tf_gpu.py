@@ -1,3 +1,4 @@
+import datetime
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -35,98 +36,224 @@ if __name__ == '__main__':
     parser.add_argument('--base_num_stocks', type=int, default=0)
     args = parser.parse_args()
 
+    # args 업데이트 가능하도록 초기화
+    stock_code_param = args.stock_code
+    ver = args.ver
+    rl_method = args.rl_method
+    net = args.net
+    num_steps = args.num_steps
+    lr = args.lr
+    discount_factor = args.discount_factor
+    start_epsilon = args.start_epsilon
+    balance = args.balance
+    num_epoches = args.num_epoches
+    delayed_reward_threshold = args.delayed_reward_threshold
+    backend = args.backend
+    output_name = args.output_name
+    value_network_name = args.value_network_name
+    policy_network_name = args.policy_network_name
+    reuse_models = args.reuse_models
+    learning = args.learning
+    start_date = args.start_date
+    end_date = args.end_date
+    base_num_stocks = args.base_num_stocks
+
+    stock_dict = {}
+
     # Keras Backend 설정
-    if args.backend == 'tensorflow':
+    if backend == 'tensorflow':
         os.environ['KERAS_BACKEND'] = 'tensorflow'
-    elif args.backend == 'plaidml':
+    elif backend == 'plaidml':
         os.environ['KERAS_BACKEND'] = 'plaidml.keras.backend'
 
-    # 출력 경로 설정
-    output_path = os.path.join(settings.BASE_DIR, 'output/{}_{}_{}'.format(args.output_name, args.rl_method, args.net))
-    if not os.path.isdir(output_path):
-        os.makedirs(output_path)
-
-    # 파라미터 기록
-    with open(os.path.join(output_path, 'params.json'), 'w') as f:
-        f.write(json.dumps(vars(args)))
-
-    # 로그 기록 설정
-    file_handler = logging.FileHandler(filename=os.path.join(output_path, "{}.log".format(args.output_name)), encoding='utf-8')
-    stream_handler = logging.StreamHandler(sys.stdout)
-    file_handler.setLevel(logging.DEBUG)
-    stream_handler.setLevel(logging.INFO)
-    logging.basicConfig(format="%(message)s", handlers=[file_handler, stream_handler], level=logging.DEBUG)
-
-    # 로그, Keras Backend 설정을 먼저하고 RLTrader 모듈들을 이후에 임포트해야 함
-    from policy_learner import ReinforcementLearner, DQNLearner, PolicyGradientLearner, ActorCriticLearner, A2CLearner, A3CLearner
-
-    # 모델 경로 준비
-    value_network_path = ''
-    policy_network_path = ''
-    if args.value_network_name is not None:
-        value_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(args.value_network_name))
-    else:
-        value_network_path = os.path.join(output_path, '{}_{}_value_{}.h5'.format(args.rl_method, args.net, args.output_name))
-    if args.policy_network_name is not None:
-        policy_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(args.policy_network_name))
-    else:
-        policy_network_path = os.path.join(output_path, '{}_{}_policy_{}.h5'.format(args.rl_method, args.net, args.output_name))
-
-    common_params = {}
-    list_stock_code = []
-    list_chart_data = []
-    list_training_data = []
-    list_min_trading_unit = []
-    list_max_trading_unit = []
-
-    if args.reuse_models:
+    if reuse_models:
         stock_db = StockDB()
+        account = stock_db.load_account_table().iloc[0].to_dict()
+        tname = 'account_detail_' + account['accountno']
+        stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
+        for stock in stock_df_list:
+            code = stock['code']
+            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': 'a2c_lstm_value_c_{}'.format(code),
+                                      'policy_net': 'a2c_lstm_policy_c_{}'.format(code), 'rl_method': 'a2c', 'net': 'lstm',
+                                      'output': 'test_{}'.format(code)}})
 
-    for stock_code in args.stock_code:
-        # 차트 데이터, 학습 데이터 준비
-        chart_data, training_data = data_manager.load_data(stock_code, args.start_date, args.end_date, ver=args.ver)
+        if len(stock_code_param) == 0:
+            stock_code_param = stock_dict.keys()
 
-        # 최소/최대 투자 단위 설정
-        min_trading_unit = max(int(100000 / chart_data.iloc[-1]['close']), 1)
-        max_trading_unit = max(int(1000000 / chart_data.iloc[-1]['close']), 1)
+        for code in stock_code_param:
+            print(code)
+            # 출력 경로 설정
+            output_name = stock_dict[code]['output']
+            output_path = os.path.join(settings.BASE_DIR, 'output/{}_{}_{}'.format(output_name, stock_dict[code]['rl_method'], stock_dict[code]['net']))
+            if not os.path.isdir(output_path):
+                os.makedirs(output_path)
 
-        # 공통 파라미터 설정
-        common_params = {'rl_method': args.rl_method, 'delayed_reward_threshold': args.delayed_reward_threshold,
-                         'net': args.net, 'num_steps': args.num_steps, 'lr': args.lr, 'output_path': output_path,
-                         'reuse_models': args.reuse_models, 'base_num_stocks': args.base_num_stocks}
+            # 파라미터 기록
+            with open(os.path.join(output_path, 'params.json'), 'w') as f:
+                f.write(json.dumps(vars(args)))
 
-        # 강화학습 시작
-        learner = None
-        if args.rl_method != 'a3c':
-            common_params.update({'stock_code': stock_code, 'chart_data': chart_data, 'training_data': training_data, 'min_trading_unit': min_trading_unit, 'max_trading_unit': max_trading_unit})
-            if args.rl_method == 'dqn':
-                learner = DQNLearner(**{**common_params, 'value_network_path': value_network_path})
-            elif args.rl_method == 'pg':
-                learner = PolicyGradientLearner(**{**common_params, 'policy_network_path': policy_network_path})
-            elif args.rl_method == 'ac':
-                learner = ActorCriticLearner(**{**common_params, 'value_network_path': value_network_path, 'policy_network_path': policy_network_path})
-            elif args.rl_method == 'a2c':
-                learner = A2CLearner(**{**common_params, 'value_network_path': value_network_path, 'policy_network_path': policy_network_path})
-            elif args.rl_method == 'monkey':
-                args.net = args.rl_method
-                args.num_epoches = 1
-                args.discount_factor = None
-                args.start_epsilon = 1
-                args.learning = False
-                learner = ReinforcementLearner(**common_params)
-            if learner is not None:
-                learner.run(balance=args.balance, num_epoches=args.num_epoches, discount_factor=args.discount_factor, start_epsilon=args.start_epsilon, learning=args.learning)
-                learner.save_models()
+            # 로그 기록 설정
+            file_handler = logging.FileHandler(filename=os.path.join(output_path, "{}.log".format(output_name)),
+                                                   encoding='utf-8')
+            stream_handler = logging.StreamHandler(sys.stdout)
+            file_handler.setLevel(logging.DEBUG)
+            stream_handler.setLevel(logging.INFO)
+            logging.basicConfig(format="%(message)s", handlers=[file_handler, stream_handler], level=logging.DEBUG)
+
+            # 로그, Keras Backend 설정을 먼저하고 RLTrader 모듈들을 이후에 임포트해야 함
+            from policy_learner import ReinforcementLearner, DQNLearner, PolicyGradientLearner, ActorCriticLearner, A2CLearner, A3CLearner
+
+            common_params = {}
+            list_stock_code = []
+            list_chart_data = []
+            list_training_data = []
+            list_min_trading_unit = []
+            list_max_trading_unit = []
+
+            for stock_code in stock_code_param:
+                base_num_stocks = stock_dict[stock_code]['count']
+                rl_method = stock_dict[stock_code]['rl_method']
+                net = stock_dict[stock_code]['net']
+                num_steps = 5
+                start_epsilon = 0
+                # num_steps 수만큼 데이터 불러옴
+                start_date = '20170101'
+                end_date = '20210701'
+                num_epoches = 1
+                # 모델 경로 준비
+                value_network_path = ''
+                policy_network_path = ''
+                value_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(stock_dict[code]['value_net']))
+                print(value_network_path)
+                policy_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(stock_dict[code]['policy_net']))
+                print(policy_network_path)
+
+                # 차트 데이터, 학습 데이터 준비
+                chart_data, training_data = data_manager.load_data(stock_code, start_date, end_date, ver=ver)
+
+                # 최소/최대 투자 단위 설정
+                min_trading_unit = max(int(100000 / chart_data.iloc[-1]['close']), 1)
+                max_trading_unit = max(int(1000000 / chart_data.iloc[-1]['close']), 1)
+
+                # 공통 파라미터 설정
+                common_params = {'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
+                                 'net': net, 'num_steps': num_steps, 'lr': lr, 'output_path': output_path,
+                                 'reuse_models': reuse_models}
+
+                # 강화학습 시작
+                learner = None
+                if rl_method != 'a3c':
+                    common_params.update(
+                        {'stock_code': stock_code, 'chart_data': chart_data, 'training_data': training_data,
+                         'min_trading_unit': min_trading_unit, 'max_trading_unit': max_trading_unit})
+                    if rl_method == 'dqn':
+                        learner = DQNLearner(**{**common_params, 'value_network_path': value_network_path})
+                    elif rl_method == 'pg':
+                        learner = PolicyGradientLearner(**{**common_params, 'policy_network_path': policy_network_path})
+                    elif rl_method == 'ac':
+                        learner = ActorCriticLearner(**{**common_params, 'value_network_path': value_network_path,
+                                                        'policy_network_path': policy_network_path})
+                    elif rl_method == 'a2c':
+                        learner = A2CLearner(**{**common_params, 'value_network_path': value_network_path,
+                                                'policy_network_path': policy_network_path})
+                    if learner is not None:
+                        learner.run(balance=balance, num_epoches=num_epoches, discount_factor=discount_factor,
+                                    start_epsilon=start_epsilon, learning=learning)
+                        learner.save_models()
+    else:
+        # 출력 경로 설정
+        output_path = os.path.join(settings.BASE_DIR, 'output/{}_{}_{}'.format(output_name, rl_method, net))
+        if not os.path.isdir(output_path):
+            os.makedirs(output_path)
+
+        # 파라미터 기록
+        with open(os.path.join(output_path, 'params.json'), 'w') as f:
+            f.write(json.dumps(vars(args)))
+
+        # 로그 기록 설정
+        file_handler = logging.FileHandler(filename=os.path.join(output_path, "{}.log".format(output_name)),
+                                           encoding='utf-8')
+        stream_handler = logging.StreamHandler(sys.stdout)
+        file_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.INFO)
+        logging.basicConfig(format="%(message)s", handlers=[file_handler, stream_handler], level=logging.DEBUG)
+
+        # 로그, Keras Backend 설정을 먼저하고 RLTrader 모듈들을 이후에 임포트해야 함
+        from policy_learner import ReinforcementLearner, DQNLearner, PolicyGradientLearner, ActorCriticLearner, A2CLearner, \
+            A3CLearner
+
+        # 모델 경로 준비
+        value_network_path = ''
+        policy_network_path = ''
+        if value_network_name is not None:
+            value_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(value_network_name))
         else:
-            list_stock_code.append(stock_code)
-            list_chart_data.append(chart_data)
-            list_training_data.append(training_data)
-            list_min_trading_unit.append(min_trading_unit)
-            list_max_trading_unit.append(max_trading_unit)
+            value_network_path = os.path.join(output_path, '{}_{}_value_{}.h5'.format(rl_method, net, output_name))
+        if policy_network_name is not None:
+            policy_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(policy_network_name))
+        else:
+            policy_network_path = os.path.join(output_path, '{}_{}_policy_{}.h5'.format(rl_method, net, output_name))
 
-    if args.rl_method == 'a3c':
-        learner = A3CLearner(**{**common_params, 'list_stock_code': list_stock_code, 'list_chart_data': list_chart_data, 'list_training_data': list_training_data, 'list_min_trading_unit': list_min_trading_unit,
-                                'list_max_trading_unit': list_max_trading_unit, 'value_network_path': value_network_path, 'policy_network_path': policy_network_path})
+        common_params = {}
+        list_stock_code = []
+        list_chart_data = []
+        list_training_data = []
+        list_min_trading_unit = []
+        list_max_trading_unit = []
 
-        learner.run(balance=args.balance, num_epoches=args.num_epoches,  discount_factor=args.discount_factor, start_epsilon=args.start_epsilon, learning=args.learning)
-        learner.save_models()
+        for stock_code in stock_code_param:
+            # 차트 데이터, 학습 데이터 준비
+            chart_data, training_data = data_manager.load_data(stock_code, start_date, end_date, ver=ver)
+
+            # 최소/최대 투자 단위 설정
+            min_trading_unit = max(int(100000 / chart_data.iloc[-1]['close']), 1)
+            max_trading_unit = max(int(1000000 / chart_data.iloc[-1]['close']), 1)
+
+            # 공통 파라미터 설정
+            common_params = {'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
+                             'net': net, 'num_steps': num_steps, 'lr': lr, 'output_path': output_path,
+                             'reuse_models': reuse_models}
+
+            # 강화학습 시작
+            learner = None
+            if rl_method != 'a3c':
+                common_params.update({'stock_code': stock_code, 'chart_data': chart_data, 'training_data': training_data,
+                                      'min_trading_unit': min_trading_unit, 'max_trading_unit': max_trading_unit})
+                if rl_method == 'dqn':
+                    learner = DQNLearner(**{**common_params, 'value_network_path': value_network_path})
+                elif rl_method == 'pg':
+                    learner = PolicyGradientLearner(**{**common_params, 'policy_network_path': policy_network_path})
+                elif rl_method == 'ac':
+                    learner = ActorCriticLearner(**{**common_params, 'value_network_path': value_network_path,
+                                                    'policy_network_path': policy_network_path})
+                elif rl_method == 'a2c':
+                    learner = A2CLearner(**{**common_params, 'value_network_path': value_network_path,
+                                            'policy_network_path': policy_network_path})
+                elif rl_method == 'monkey':
+                    net = rl_method
+                    num_epoches = 1
+                    discount_factor = None
+                    start_epsilon = 1
+                    learning = False
+                    learner = ReinforcementLearner(**common_params)
+                if learner is not None:
+                    learner.run(balance=balance, num_epoches=num_epoches, discount_factor=discount_factor,
+                                start_epsilon=start_epsilon, learning=learning)
+                    learner.save_models()
+            else:
+                list_stock_code.append(stock_code)
+                list_chart_data.append(chart_data)
+                list_training_data.append(training_data)
+                list_min_trading_unit.append(min_trading_unit)
+                list_max_trading_unit.append(max_trading_unit)
+
+        if rl_method == 'a3c':
+            learner = A3CLearner(**{**common_params, 'list_stock_code': list_stock_code, 'list_chart_data': list_chart_data,
+                                    'list_training_data': list_training_data,
+                                    'list_min_trading_unit': list_min_trading_unit,
+                                    'list_max_trading_unit': list_max_trading_unit,
+                                    'value_network_path': value_network_path, 'policy_network_path': policy_network_path})
+
+            learner.run(balance=balance, num_epoches=num_epoches, discount_factor=discount_factor,
+                        start_epsilon=start_epsilon, learning=learning)
+            learner.save_models()

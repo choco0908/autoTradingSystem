@@ -19,10 +19,10 @@ import pandas as pd
 from exchange_calendars import get_calendar
 
 # DB
+import threading
 from DataBase.SqliteDB import StockDB
 
 # Custom
-from config.kiwoomType import RealType
 from datetime import datetime
 import logging
 
@@ -49,6 +49,7 @@ entrypoint = KiwoomOpenApiPlusEntrypoint()
 logging.info('Logging in...')
 entrypoint.EnsureConnected()
 logging.info('Logged in.')
+base_account = entrypoint.GetAccountList()[0]
 
 # 3. kospi/kosdaq 종목리스트 저장
 # 종목 리스트 확인 (기본 함수 호출 예시)
@@ -61,6 +62,8 @@ codes = entrypoint.GetKosdaqCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kosdaq = dict(zip(names, codes))
 names_by_codes_dict_kosdaq = dict(zip(codes, names))
+logging.info('End stock codes and names...')
+
 
 # 6.주문처리
 krx_calendar = get_calendar('XKRX')
@@ -90,10 +93,8 @@ def disconnect():
 
 @app.route('/myaccount', methods=['GET'])
 def myaccount():
-    save_account_info()
-
-    sAccNo = entrypoint.GetAccountList()[0]
-    account = stock_db.load_account_table(sAccNo).to_html()
+    sAccNo = base_account
+    account = stock_db.load_account_table().to_html()
     tname = 'account_detail_{}'.format(sAccNo)
     account_detail = stock_db.load_account_detail_table(tname)
     result = account + '</br></br>'
@@ -111,7 +112,7 @@ def get_stock_list(kind):
 
 @app.route('/basic_info/<code>')
 @as_json
-def get_basic_info(code):
+def get_basic_info(code): # 업데이트 예정
     logging.info('Getting basic info of %s', code)
     info = entrypoint.GetStockBasicInfoAsDict(code)
     logging.info('Got basic info data (using GetStockBasicInfoAsDict):')
@@ -120,7 +121,6 @@ def get_basic_info(code):
 @app.route('/index_stock_data/<name>')
 def get_index_stock_data(name):
     # date, open, high, low, close, volume
-    save_index_stock_data(name)
     tname = stock_db.getTableName(name)
     result = stock_db.load(tname)
 
@@ -145,7 +145,6 @@ def get_index_stock_data(name):
 
 @app.route('/daily_stock_data/<code>')
 def get_daily_stock_data(code):
-    save_daily_stock_data(code)
     parameter = request.args.to_dict()
     startdate = ''
     if len(parameter) > 0 and 'startdate' in parameter.keys():
@@ -163,23 +162,17 @@ def get_daily_stock_data(code):
     if result is None:
         return ('', 204)
 
-    #df = result.iloc[::-1]
-    #sd = StockData(code, df).calcIndicators()
-    #sd = sd.iloc[::-1]
-
     dates = pd.to_datetime(result['date'], format='%Y%m%d')
     closes = pd.to_numeric(result['close'])
     f = plt.figure()
     plt.plot(dates, closes)
     html += mpld3.fig_to_html(f, figid='Stock_Chart')
     html += '</br></br>'
-    #html += sd.to_html()
     html += result.to_html()
     return html
 
 @app.route('/daily_detail_stock_data/<code>')
 def get_daily_detail_stock_data(code):
-    save_daily_stock_data(code)
     parameter = request.args.to_dict()
     startdate = ''
     if len(parameter) > 0 and 'startdate' in parameter.keys():
@@ -252,6 +245,30 @@ def order(code, count, action):
     else:
         logging.info('Cannot send an order while market is not open, skipping...')
         return 'Cannot send an order while market is not open, skipping...'
+
+@app.route('/update_database')
+def update_database():
+    print('Updating Database.......')
+    stock_list = []
+    index_dict = {"kospi": "001", "big": "002", "medium": "003", "small": "004", "kosdaq": "101", "kospi200": "201",
+                      "kostar": "302", "krx100": "701"}
+    with open('stock_list.txt', 'r', encoding='utf-8') as f:
+        while True:
+            line = f.readline()
+            if not line: break
+            code = line.split(';')[0]
+            stock_list.append(code)
+        f.close()
+
+    # DB 한번에 업데이트
+    save_account_info()
+    save_index_stock_data('kospi')
+    print(stock_list)
+    for code in stock_list:
+        save_daily_stock_data(code)
+
+    print('Finishing Update Database.......')
+    return ('', 204)
 
 def is_currently_in_session():
     now = Timestamp.now(tz=krx_calendar.tz)
@@ -381,7 +398,7 @@ def save_daily_stock_data(code):
     logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
     tname = stock_db.getTableName(code)
     if stock_db.checkTableName(tname) == False:
-        if stock_db.create_table(tname) == False:
+        if stock_db.create_table_detail(tname) == False:
             logging.debug(code+' table create failed')
 
     date = stock_db.load_first(tname)

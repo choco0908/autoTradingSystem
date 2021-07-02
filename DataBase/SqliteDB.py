@@ -27,10 +27,10 @@ class StockDB:
         except:
             return None
 
-    def load_account_table(self, accno):
+    def load_account_table(self):
         c = self.conn
         try:
-            sql = "SELECT accountno, balance FROM account_info WHERE accountno == \'%s\'" % accno
+            sql = "SELECT accountno, balance FROM account_info"
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:

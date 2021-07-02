@@ -153,7 +153,6 @@ class Agent:
                 self.balance -= invest_amount  # 보유 현금을 갱신
                 self.num_stocks += trading_unit  # 보유 주식 수를 갱신
                 self.num_buy += 1  # 매수 횟수 증가
-                print('buy:', str(trading_unit), ' total: ', self.num_stocks)
         # 매도
         elif action == Agent.ACTION_SELL:
             # 매도할 단위를 판단
@@ -166,7 +165,6 @@ class Agent:
                 self.num_stocks -= trading_unit  # 보유 주식 수를 갱신
                 self.balance += invest_amount  # 보유 현금을 갱신
                 self.num_sell += 1  # 매도 횟수 증가
-                print('sell:', str(trading_unit), ' total: ', self.num_stocks)
         #관망
         elif action == Agent.ACTION_HOLD:
             self.num_hold += 1 # 관망 횟수 증가
