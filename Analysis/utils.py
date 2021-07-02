@@ -21,4 +21,7 @@ def get_time_str():
 
 
 def sigmoid(x):
-    return 1. / (1. + np.exp(-x))
+    if -x > np.log(np.finfo(type(x)).max):
+        return 0.0
+    a = np.exp(-x)
+    return 1.0 / (1.0 + a)

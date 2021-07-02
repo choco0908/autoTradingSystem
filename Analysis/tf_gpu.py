@@ -12,6 +12,8 @@ import settings
 import utils
 import data_manager
 
+import requests
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--stock_code', nargs='+') # 종목 코드
@@ -34,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--start_date', default='20170101')
     parser.add_argument('--end_date', default='20171231')
     parser.add_argument('--base_num_stocks', type=int, default=0)
+    parser.add_argument('--update', action='store_false')
     args = parser.parse_args()
 
     # args 업데이트 가능하도록 초기화
@@ -60,6 +63,10 @@ if __name__ == '__main__':
 
     stock_dict = {}
 
+    if args.update:
+        response = requests.get('http://127.0.0.1:5000/update_database')
+        print('update_database '+str(response.status_code))
+
     # Keras Backend 설정
     if backend == 'tensorflow':
         os.environ['KERAS_BACKEND'] = 'tensorflow'
@@ -73,9 +80,9 @@ if __name__ == '__main__':
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
         for stock in stock_df_list:
             code = stock['code']
-            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': 'a2c_lstm_value_c_{}'.format(code),
-                                      'policy_net': 'a2c_lstm_policy_c_{}'.format(code), 'rl_method': 'a2c', 'net': 'lstm',
-                                      'output': 'test_{}'.format(code)}})
+            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value_network_name,
+                                      'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
+                                      'output': 'test_{}'.format(code), 'havratio': stock['havratio']}})
 
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
@@ -111,14 +118,19 @@ if __name__ == '__main__':
             list_max_trading_unit = []
 
             for stock_code in stock_code_param:
-                base_num_stocks = stock_dict[stock_code]['count']
+                base_num_stocks = int(stock_dict[stock_code]['count'])
                 rl_method = stock_dict[stock_code]['rl_method']
                 net = stock_dict[stock_code]['net']
+                have_stock_ratio = stock_dict[stock_code]['havratio']
                 num_steps = 5
                 start_epsilon = 0
                 # num_steps 수만큼 데이터 불러옴
-                start_date = '20170101'
-                end_date = '20210701'
+                tname = 'StockData_{}'.format(stock_code)
+                df = stock_db.load_nrows(tname, num_steps)
+                df = df[['date']]
+                df = df.astype({'date': 'str'})
+                start_date = df.iloc[num_steps-1]['date']
+                end_date = df.iloc[0]['date']
                 num_epoches = 1
                 # 모델 경로 준비
                 value_network_path = ''
@@ -138,7 +150,7 @@ if __name__ == '__main__':
                 # 공통 파라미터 설정
                 common_params = {'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
                                  'net': net, 'num_steps': num_steps, 'lr': lr, 'output_path': output_path,
-                                 'reuse_models': reuse_models}
+                                 'reuse_models': reuse_models, 'have_stock_ratio': float(have_stock_ratio)}
 
                 # 강화학습 시작
                 learner = None
@@ -160,6 +172,25 @@ if __name__ == '__main__':
                         learner.run(balance=balance, num_epoches=num_epoches, discount_factor=discount_factor,
                                     start_epsilon=start_epsilon, learning=learning)
                         learner.save_models()
+                else:
+                    list_stock_code.append(stock_code)
+                    list_chart_data.append(chart_data)
+                    list_training_data.append(training_data)
+                    list_min_trading_unit.append(min_trading_unit)
+                    list_max_trading_unit.append(max_trading_unit)
+
+            if rl_method == 'a3c':
+                learner = A3CLearner(
+                    **{**common_params, 'list_stock_code': list_stock_code, 'list_chart_data': list_chart_data,
+                       'list_training_data': list_training_data,
+                       'list_min_trading_unit': list_min_trading_unit,
+                       'list_max_trading_unit': list_max_trading_unit,
+                       'value_network_path': value_network_path, 'policy_network_path': policy_network_path})
+
+                learner.run(balance=balance, num_epoches=num_epoches, discount_factor=discount_factor,
+                            start_epsilon=start_epsilon, learning=learning)
+                learner.save_models()
+
     else:
         # 출력 경로 설정
         output_path = os.path.join(settings.BASE_DIR, 'output/{}_{}_{}'.format(output_name, rl_method, net))

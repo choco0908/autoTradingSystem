@@ -11,7 +11,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            create_sql = "CREATE TABLE account_info (accountno TEXT PRIMARY KEY, balance INTEGER, cash INTEGER);" # accoutno: 계좌번호, balance: 예수금, cash: 출금가능금액
+            create_sql = "CREATE TABLE account_info (accountno TEXT PRIMARY KEY, balance INTEGER, cash INTEGER, totalbalance INTEGER, pvbalance INTEGER, totalwinratio REAL);" # accoutno: 계좌번호, balance: 예수금, cash: 출금가능금액
             cur.execute(create_sql)
             return True
         except:
@@ -21,7 +21,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            sql = "INSERT OR REPLACE INTO account_info ('accountno', 'balance', 'cash') VALUES(?, ?, ?)"
+            sql = "INSERT OR REPLACE INTO account_info ('accountno', 'balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio') VALUES(?, ?, ?, ?, ?, ?)"
             cur.executemany(sql, dataframe.values)
             c.commit()
         except:
@@ -30,7 +30,7 @@ class StockDB:
     def load_account_table(self):
         c = self.conn
         try:
-            sql = "SELECT accountno, balance FROM account_info"
+            sql = "SELECT accountno, balance, 'totalbalance', 'pvbalance', 'totalwinratio' FROM account_info"
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:
@@ -89,7 +89,7 @@ class StockDB:
     def load_account_detail_table(self, tname):
         c = self.conn
         try:
-            sql = "SELECT code, name, tradecount FROM \'%s\'" % tname
+            sql = "SELECT code, name, tradecount, havratio FROM \'%s\'" % tname
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:
@@ -168,6 +168,16 @@ class StockDB:
         c = self.conn
         try:
             sql = "SELECT * FROM \'%s\' ORDER BY date DESC, ROWID LIMIT 1" % tname
+            df = pd.read_sql(sql, c, index_col=None)
+            return df
+        except:
+            return None
+
+    def load_nrows(self, tname, nrow):
+        print('[+] call load nrows %s' % tname)
+        c = self.conn
+        try:
+            sql = "SELECT * FROM %s ORDER BY date DESC, ROWID LIMIT %s" % (tname, nrow)
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:

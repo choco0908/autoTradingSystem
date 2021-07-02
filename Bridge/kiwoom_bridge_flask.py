@@ -295,15 +295,12 @@ def save_account_info():
         if stock_db.create_account_table() == False:
             logging.debug('Account table create failed')
 
-    df = pd.DataFrame(columns=['예수금', '출금가능금액'])
+    df = pd.DataFrame(columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
 
     sAccNo_list = entrypoint.GetAccountList()
     logging.info('Getting DepositInfo Data')
     for sAccNo in sAccNo_list:
         deposit = entrypoint.GetDepositInfo(account_no=sAccNo)
-        record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액']}], columns=['예수금', '출금가능금액'])
-        df = df.append(record, ignore_index=True)
-
         logging.info('Got DepositInfo Data (using GetDepositInfo)')
         logging.info('Getting Account Detail Data')
 
@@ -312,9 +309,14 @@ def save_account_info():
             if stock_db.create_account_detail_table(tname) == False:
                 logging.debug('account_detail_{} table create failed'.format(sAccNo))
 
-        (_, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
+        (totalbalance, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
+        totalbalance = totalbalance[['총매입금액', '총평가금액', '총수익률(%)']]
         balancedetail = balancedetail[
             ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)']]
+        record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액'], '총매입금액': totalbalance['총매입금액'],
+                                '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)']}],
+                              columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
+        df = df.append(record, ignore_index=True)
         logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
         balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio']
         balancedetail = balancedetail.astype({'code': 'str', 'name': 'str', 'count': 'int', 'tradecount': 'int', 'winratio': 'float', 'havratio': 'float'})
@@ -322,8 +324,9 @@ def save_account_info():
         stock_db.save_account_detail_table(tname, balancedetail)
 
     df['계좌번호'] = pd.Series(sAccNo_list)
-    df.columns = ['balance', 'cash', 'accountno']
-    df = df[['accountno', 'balance', 'cash']]
+    df.columns = ['balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio', 'accountno']
+    # '계좌번호', '예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'
+    df = df[['accountno', 'balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio']]
     stock_db.save_account_table(df)
 
 def save_index_stock_data(name, scrno=None):
@@ -511,6 +514,6 @@ def getmaximumdate(date_text): # data 최대 10년치만 저장
         return max_date
 
 if __name__ == '__main__':
-    server = Process(target=app.run(debug=True))
+    server = Process(target=app.run())
     server.start()
 

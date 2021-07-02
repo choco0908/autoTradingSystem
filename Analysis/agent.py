@@ -5,6 +5,7 @@
 
 import numpy as np
 import utils
+import requests
 
 class Agent:
     # 에이전트 상태가 구성하는 값 개수
@@ -22,7 +23,7 @@ class Agent:
     NUM_ACTIONS = len(ACTIONS) # 인공 신경망에서 고려할 출력값의 개수
 
 
-    def __init__(self, environment, min_trading_unit = 1, max_trading_unit = 2, delayed_reward_threshold = .05 , base_num_stocks = 0):
+    def __init__(self, environment, min_trading_unit = 1, max_trading_unit = 2, delayed_reward_threshold = .05 , base_num_stocks = 0 , have_stock_ratio = 0.0, reuse_models = False, stock_code = None):
         # Environment 객체
         self.environment = environment # 현재 주식 가격을 가져오기 위해 환경 참조
 
@@ -36,6 +37,9 @@ class Agent:
         self.balance = 0  # 현재 현금 잔고
         self.base_num_stocks = base_num_stocks
         self.num_stocks = base_num_stocks  # 보유 주식 수
+        self.have_stock_ratio = have_stock_ratio # DB의 보유 비융
+        self.reuse_models = reuse_models # 실제 투자일 경우 처리
+        self.stock_code = stock_code
         # 포트폴리오 가치: balance + num_stocks * {현재 주식 가격}
         self.portfolio_value = 0
         self.base_portfolio_value = 0  # 직전 학습 시점의 PV
@@ -73,7 +77,10 @@ class Agent:
         self.initial_balance = balance
 
     def get_states(self):
-        self.ratio_hold = self.num_stocks / int(self.portfolio_value / self.environment.get_price())
+        if self.reuse_models:
+            self.ratio_hold = self.have_stock_ratio
+        else:
+            self.ratio_hold = self.num_stocks / int(self.portfolio_value / self.environment.get_price())
         self.ratio_portfolio_value = (self.portfolio_value / self.base_portfolio_value)
         return (self.ratio_hold, self.ratio_portfolio_value)
 
@@ -114,6 +121,8 @@ class Agent:
         validity = True
         if action == Agent.ACTION_BUY:
             # 적어도 1주를 살 수 있는지 확인
+            if self.reuse_models and self.have_stock_ratio > 10:
+                return False
             if self.balance < self.environment.get_price() * (1 + self.TRADING_CHARGE) * self.min_trading_unit:
                 validity = False
         elif action == Agent.ACTION_SELL:
@@ -138,6 +147,7 @@ class Agent:
         # 즉시 보상 초기화
         self.immediate_reward = 0
 
+        # /order/<code>/<count>/<action>
         # 매수
         if action == Agent.ACTION_BUY:
             # 매수할 단위를 판단
@@ -153,6 +163,10 @@ class Agent:
                 self.balance -= invest_amount  # 보유 현금을 갱신
                 self.num_stocks += trading_unit  # 보유 주식 수를 갱신
                 self.num_buy += 1  # 매수 횟수 증가
+            if self.reuse_models:
+                trading_url = 'http://127.0.0.1:5000/order/{}/{}/buy'.format(self.stock_code, str(trading_unit))
+                response = requests.get(trading_url)
+                print('buy {} stocks , status = {}'.format(str(trading_unit),str(response.status_code)))
         # 매도
         elif action == Agent.ACTION_SELL:
             # 매도할 단위를 판단
@@ -165,9 +179,16 @@ class Agent:
                 self.num_stocks -= trading_unit  # 보유 주식 수를 갱신
                 self.balance += invest_amount  # 보유 현금을 갱신
                 self.num_sell += 1  # 매도 횟수 증가
+            if self.reuse_models:
+                print()
+                trading_url = 'http://127.0.0.1:5000/order/{}/{}/sell'.format(self.stock_code, str(trading_unit))
+                response = requests.get(trading_url)
+                print('sell {} stocks , status = {}'.format(str(trading_unit),str(response.status_code)))
         #관망
         elif action == Agent.ACTION_HOLD:
             self.num_hold += 1 # 관망 횟수 증가
+            if self.reuse_models:
+                print('hold action')
 
         # 포트폴리오 가치 갱신
         self.portfolio_value = self.balance + curr_price * self.num_stocks #현금 + 현재가*주식수
