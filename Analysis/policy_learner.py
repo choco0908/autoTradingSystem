@@ -17,7 +17,7 @@ class ReinforcementLearner:
     lock = threading.Lock()
 
     def __init__(self, rl_method='rl', stock_code=None, chart_data=None, training_data=None, min_trading_unit=1, max_trading_unit=2, delayed_reward_threshold=.05, net='dnn', num_steps=1, lr=0.001,
-                 value_network=None, policy_network=None, output_path='', reuse_models=True, base_num_stocks=0, have_stock_ratio=0.0):
+                 value_network=None, policy_network=None, output_path='', reuse_models=True, base_num_stocks=0, win_stock_ratio=0.0, have_stock_ratio=0.0):
         # 인자 확인
         assert min_trading_unit > 0
         assert max_trading_unit > 0
@@ -31,7 +31,7 @@ class ReinforcementLearner:
         self.chart_data = chart_data
         self.environment = Environment(chart_data, training_data)
         # 에이전트 설정
-        self.agent = Agent(self.environment, min_trading_unit=min_trading_unit, max_trading_unit=max_trading_unit, delayed_reward_threshold=delayed_reward_threshold, base_num_stocks=base_num_stocks, have_stock_ratio=have_stock_ratio, reuse_models=reuse_models, stock_code=stock_code)
+        self.agent = Agent(self.environment, min_trading_unit=min_trading_unit, max_trading_unit=max_trading_unit, delayed_reward_threshold=delayed_reward_threshold, base_num_stocks=base_num_stocks, win_stock_ratio=win_stock_ratio, have_stock_ratio=have_stock_ratio, reuse_models=reuse_models, stock_code=stock_code)
         # 학습을 위해 전처리된 데이터
         self.training_data = training_data
         self.sample = None

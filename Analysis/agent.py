@@ -23,7 +23,8 @@ class Agent:
     NUM_ACTIONS = len(ACTIONS) # 인공 신경망에서 고려할 출력값의 개수
 
 
-    def __init__(self, environment, min_trading_unit = 1, max_trading_unit = 2, delayed_reward_threshold = .05 , base_num_stocks = 0 , have_stock_ratio = 0.0, reuse_models = False, stock_code = None):
+    def __init__(self, environment, min_trading_unit=1, max_trading_unit=2, delayed_reward_threshold=.05,
+                 base_num_stocks=0, win_stock_ratio=0.0, have_stock_ratio=0.0, reuse_models=False, stock_code=None):
         # Environment 객체
         self.environment = environment # 현재 주식 가격을 가져오기 위해 환경 참조
 
@@ -37,7 +38,8 @@ class Agent:
         self.balance = 0  # 현재 현금 잔고
         self.base_num_stocks = base_num_stocks
         self.num_stocks = base_num_stocks  # 보유 주식 수
-        self.have_stock_ratio = have_stock_ratio # DB의 보유 비융
+        self.win_stock_ratio = win_stock_ratio # 실제투자 수익률
+        self.have_stock_ratio = have_stock_ratio # 실제투자 보유 비중
         self.reuse_models = reuse_models # 실제 투자일 경우 처리
         self.stock_code = stock_code
         # 포트폴리오 가치: balance + num_stocks * {현재 주식 가격}
@@ -79,9 +81,11 @@ class Agent:
     def get_states(self):
         if self.reuse_models:
             self.ratio_hold = self.have_stock_ratio
+            self.portfolio_value = self.win_stock_ratio
         else:
             self.ratio_hold = self.num_stocks / int(self.portfolio_value / self.environment.get_price())
-        self.ratio_portfolio_value = (self.portfolio_value / self.base_portfolio_value)
+            self.ratio_portfolio_value = (self.portfolio_value / self.base_portfolio_value)
+        print('ratio_hold = {}, ratio_portfolio_value = {}'.format(self.ratio_hold, self.portfolio_value))
         return (self.ratio_hold, self.ratio_portfolio_value)
 
     def decide_action(self, pred_value, pred_policy, epsilon):

@@ -82,7 +82,7 @@ if __name__ == '__main__':
             code = stock['code']
             stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value_network_name,
                                       'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
-                                      'output': 'test_{}'.format(code), 'havratio': stock['havratio']}})
+                                      'output': 'test_{}'.format(code), 'winratio': stock['winratio'], 'havratio': stock['havratio']}})
 
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
@@ -121,6 +121,7 @@ if __name__ == '__main__':
                 base_num_stocks = int(stock_dict[stock_code]['count'])
                 rl_method = stock_dict[stock_code]['rl_method']
                 net = stock_dict[stock_code]['net']
+                win_stock_ratio = stock_dict[stock_code]['winratio']
                 have_stock_ratio = stock_dict[stock_code]['havratio']
                 num_steps = 5
                 start_epsilon = 0
@@ -150,7 +151,7 @@ if __name__ == '__main__':
                 # 공통 파라미터 설정
                 common_params = {'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
                                  'net': net, 'num_steps': num_steps, 'lr': lr, 'output_path': output_path,
-                                 'reuse_models': reuse_models, 'have_stock_ratio': float(have_stock_ratio)}
+                                 'reuse_models': reuse_models, 'win_stock_ratio': float(win_stock_ratio), 'have_stock_ratio': float(have_stock_ratio)}
 
                 # 강화학습 시작
                 learner = None
