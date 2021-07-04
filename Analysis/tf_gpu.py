@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--start_date', default='20170101')
     parser.add_argument('--end_date', default='20171231')
     parser.add_argument('--base_num_stocks', type=int, default=0)
-    parser.add_argument('--update', action='store_false')
+    parser.add_argument('--update', action='store_true')
     args = parser.parse_args()
 
     # args 업데이트 가능하도록 초기화
@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     stock_dict = {}
 
-    if args.update:
+    if args.update and reuse_models:
         response = requests.get('http://127.0.0.1:5000/update_database')
         print('update_database '+str(response.status_code))
 

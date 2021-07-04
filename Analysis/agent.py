@@ -82,10 +82,10 @@ class Agent:
         if self.reuse_models:
             self.ratio_hold = self.have_stock_ratio
             self.portfolio_value = self.win_stock_ratio
+            print('ratio_hold = {}, ratio_portfolio_value = {}'.format(self.ratio_hold, self.portfolio_value))
         else:
             self.ratio_hold = self.num_stocks / int(self.portfolio_value / self.environment.get_price())
             self.ratio_portfolio_value = (self.portfolio_value / self.base_portfolio_value)
-        print('ratio_hold = {}, ratio_portfolio_value = {}'.format(self.ratio_hold, self.portfolio_value))
         return (self.ratio_hold, self.ratio_portfolio_value)
 
     def decide_action(self, pred_value, pred_policy, epsilon):
