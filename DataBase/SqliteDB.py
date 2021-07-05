@@ -30,7 +30,7 @@ class StockDB:
     def load_account_table(self):
         c = self.conn
         try:
-            sql = "SELECT accountno, balance, 'totalbalance', 'pvbalance', 'totalwinratio' FROM account_info"
+            sql = "SELECT accountno, balance, totalbalance, pvbalance, totalwinratio FROM account_info"
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:
@@ -69,7 +69,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            create_sql = "CREATE TABLE \'%s\' (code TEXT PRIMARY KEY, name TEXT, count INTEGER, tradecount INTEGER, winratio REAL, havratio REAL);" % tname
+            create_sql = "CREATE TABLE \'%s\' (code TEXT PRIMARY KEY, name TEXT, count INTEGER, tradecount INTEGER, winratio REAL, havratio REAL, totalbuyprice INTEGER);" % tname
             cur.execute(create_sql)
             return True
         except:
@@ -80,7 +80,7 @@ class StockDB:
         c = self.conn
         try:
             cur = c.cursor()
-            sql = "INSERT OR REPLACE INTO \'%s\' ('code', 'name', 'count', 'tradecount', 'winratio', 'havratio') VALUES(?, ?, ?, ?, ?, ?)" % tname
+            sql = "INSERT OR REPLACE INTO \'%s\' ('code', 'name', 'count', 'tradecount', 'winratio', 'havratio', 'totalbuyprice') VALUES(?, ?, ?, ?, ?, ?, ?)" % tname
             cur.executemany(sql, dataframe.values)
             c.commit()
         except:
@@ -89,7 +89,7 @@ class StockDB:
     def load_account_detail_table(self, tname):
         c = self.conn
         try:
-            sql = "SELECT code, name, tradecount, winratio, havratio FROM \'%s\'" % tname
+            sql = "SELECT code, name, tradecount, winratio, havratio, totalbuyprice FROM \'%s\'" % tname
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:

@@ -74,26 +74,29 @@ if __name__ == '__main__':
         os.environ['KERAS_BACKEND'] = 'plaidml.keras.backend'
 
     if reuse_models:
+        response = requests.get('http://127.0.0.1:5000/update_account')
+        print('update_account ' + str(response.status_code))
         stock_db = StockDB()
         account = stock_db.load_account_table().iloc[0].to_dict()
+        base_balance = int(account['balance']) + int(account['totalbalance'])
         tname = 'account_detail_' + account['accountno']
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
+        initial_balance = int(base_balance / len(stock_df_list))
         for code in stock_code_param:
             stock_dict.update({code: {'count': 0, 'value_net': value_network_name,
                                       'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
-                                      'output': 'test_{}'.format(code), 'winratio': 0.0,
-                                      'havratio': 0.0}})
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%d%m'), code), 'winratio': 0.0,
+                                      'havratio': 0.0, 'balance': initial_balance}})
         for stock in stock_df_list:
             code = stock['code']
+            balance = initial_balance - stock['totalbuyprice'] if initial_balance > stock['totalbuyprice'] else 0
             stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value_network_name,
                                       'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
-                                      'output': 'test_{}'.format(code), 'winratio': stock['winratio'], 'havratio': stock['havratio']}})
-
+                                      'output': 'test_{}'.format(code), 'winratio': stock['winratio'], 'havratio': stock['havratio'], 'balance': balance}})
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
 
         for code in stock_code_param:
-            print(code)
             # 출력 경로 설정
             output_name = stock_dict[code]['output']
             output_path = os.path.join(settings.BASE_DIR, 'output/{}_{}_{}'.format(output_name, stock_dict[code]['rl_method'], stock_dict[code]['net']))
@@ -128,6 +131,7 @@ if __name__ == '__main__':
                 net = stock_dict[stock_code]['net']
                 win_stock_ratio = stock_dict[stock_code]['winratio']
                 have_stock_ratio = stock_dict[stock_code]['havratio']
+                balance = stock_dict[stock_code]['balance']
                 num_steps = 5
                 start_epsilon = 0
                 # num_steps 수만큼 데이터 불러옴

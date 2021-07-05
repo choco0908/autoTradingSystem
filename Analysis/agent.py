@@ -125,8 +125,6 @@ class Agent:
         validity = True
         if action == Agent.ACTION_BUY:
             # 적어도 1주를 살 수 있는지 확인
-            if self.reuse_models and self.have_stock_ratio > 10:
-                return False
             if self.balance < self.environment.get_price() * (1 + self.TRADING_CHARGE) * self.min_trading_unit:
                 validity = False
         elif action == Agent.ACTION_SELL:

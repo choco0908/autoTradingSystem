@@ -261,13 +261,20 @@ def update_database():
         f.close()
 
     # DB 한번에 업데이트
-    save_account_info()
+    #save_account_info() 각 종목 매매 후 업데이트로 변경
     save_index_stock_data('kospi')
     print(stock_list)
     for code in stock_list:
         save_daily_stock_data(code)
 
     print('Finishing Update Database.......')
+    return ('', 204)
+
+@app.route('/update_account')
+def update_account():
+    print('Updating Account.......')
+    save_account_info()
+    print('Finishing Update Account.......')
     return ('', 204)
 
 def is_currently_in_session():
@@ -312,14 +319,14 @@ def save_account_info():
         (totalbalance, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
         totalbalance = totalbalance[['총매입금액', '총평가금액', '총수익률(%)']]
         balancedetail = balancedetail[
-            ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)']]
+            ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)', '매입금액']]
         record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액'], '총매입금액': totalbalance['총매입금액'],
                                 '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)']}],
                               columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
         df = df.append(record, ignore_index=True)
         logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
-        balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio']
-        balancedetail = balancedetail.astype({'code': 'str', 'name': 'str', 'count': 'int', 'tradecount': 'int', 'winratio': 'float', 'havratio': 'float'})
+        balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio', 'totalbuyprice']
+        balancedetail = balancedetail.astype({'code': 'str', 'name': 'str', 'count': 'int', 'tradecount': 'int', 'winratio': 'float', 'havratio': 'float', 'totalbuyprice': 'int'})
         balancedetail['code'] = balancedetail['code'].apply(lambda _: _[1:]) # 종목코드 A 제거
         stock_db.save_account_detail_table(tname, balancedetail)
 
