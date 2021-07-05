@@ -78,6 +78,11 @@ if __name__ == '__main__':
         account = stock_db.load_account_table().iloc[0].to_dict()
         tname = 'account_detail_' + account['accountno']
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
+        for code in stock_code_param:
+            stock_dict.update({code: {'count': 0, 'value_net': value_network_name,
+                                      'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
+                                      'output': 'test_{}'.format(code), 'winratio': 0.0,
+                                      'havratio': 0.0}})
         for stock in stock_df_list:
             code = stock['code']
             stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value_network_name,
