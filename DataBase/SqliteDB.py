@@ -89,7 +89,7 @@ class StockDB:
     def load_account_detail_table(self, tname):
         c = self.conn
         try:
-            sql = "SELECT code, name, tradecount, winratio, havratio, totalbuyprice FROM \'%s\'" % tname
+            sql = "SELECT code, name, tradecount, winratio, havratio, totalbuyprice FROM \'%s\' ORDER BY totalbuyprice DESC" % tname
             df = pd.read_sql(sql, c, index_col=None)
             return df
         except:

@@ -82,17 +82,17 @@ if __name__ == '__main__':
         tname = 'account_detail_' + account['accountno']
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
         initial_balance = int(base_balance / len(stock_df_list))
-        for code in stock_code_param:
-            stock_dict.update({code: {'count': 0, 'value_net': value_network_name,
-                                      'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
-                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%d%m'), code), 'winratio': 0.0,
+        for code in stock_code_param: # 신규 종목 매매
+            stock_dict.update({code: {'count': 0, 'value_net': '{}_{}_value_{}'.format(rl_method, net, code),
+                                      'policy_net': '{}_{}_policy_{}'.format(rl_method, net, code), 'rl_method': rl_method, 'net': net,
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': 0.0,
                                       'havratio': 0.0, 'balance': initial_balance}})
-        for stock in stock_df_list:
+        for stock in stock_df_list: # 기존 종목 매매
             code = stock['code']
             balance = initial_balance - stock['totalbuyprice'] if initial_balance > stock['totalbuyprice'] else 0
-            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value_network_name,
-                                      'policy_net': policy_network_name, 'rl_method': rl_method, 'net': net,
-                                      'output': 'test_{}'.format(code), 'winratio': stock['winratio'], 'havratio': stock['havratio'], 'balance': balance}})
+            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': '{}_{}_value_{}'.format(rl_method, net, code),
+                                      'policy_net': '{}_{}_policy_{}'.format(rl_method, net, code), 'rl_method': rl_method, 'net': net,
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['havratio'], 'balance': balance}})
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
 
@@ -143,8 +143,6 @@ if __name__ == '__main__':
                 end_date = df.iloc[0]['date']
                 num_epoches = 1
                 # 모델 경로 준비
-                value_network_path = ''
-                policy_network_path = ''
                 value_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(stock_dict[code]['value_net']))
                 print(value_network_path)
                 policy_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(stock_dict[code]['policy_net']))
