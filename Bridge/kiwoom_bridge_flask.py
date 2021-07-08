@@ -46,14 +46,14 @@ stock_db = StockDB()
 entrypoint = KiwoomOpenApiPlusEntrypoint()
 
 # 2. 로그인
-logging.info('Logging in...')
+print('Logging in...')
 entrypoint.EnsureConnected()
-logging.info('Logged in.')
+print('Logged in.')
 base_account = entrypoint.GetAccountList()[0]
 
 # 3. kospi/kosdaq 종목리스트 저장
 # 종목 리스트 확인 (기본 함수 호출 예시)
-logging.info('Getting stock codes and names...')
+print('Getting stock codes and names...')
 codes = entrypoint.GetKospiCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kospi = dict(zip(names, codes))
@@ -62,7 +62,7 @@ codes = entrypoint.GetKosdaqCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kosdaq = dict(zip(names, codes))
 names_by_codes_dict_kosdaq = dict(zip(codes, names))
-logging.info('End stock codes and names...')
+print('End stock codes and names...')
 
 
 # 6.주문처리
@@ -79,9 +79,9 @@ def as_json(f):
 @app.route('/')
 def home():
     # 접속 상태 확인 (기본 함수 호출 예시)
-    logging.info('Checking connection status...')
+    print('Checking connection status...')
     status = entrypoint.GetConnectState()
-    logging.info('Connection status: %s', status)
+    print('Connection status: %s', status)
     return 'Kiwoom Bridge Made By Dotz'
 
 @app.route('/disconnect', methods=['GET'])
@@ -89,7 +89,7 @@ def disconnect():
     # 리소스 해제
     entrypoint.close()
     shutdown_server()
-    logging.info('Server shutting down...')
+    print('Server shutting down...')
 
 @app.route('/myaccount', methods=['GET'])
 def myaccount():
@@ -113,9 +113,9 @@ def get_stock_list(kind):
 @app.route('/basic_info/<code>')
 @as_json
 def get_basic_info(code): # 업데이트 예정
-    logging.info('Getting basic info of %s', code)
+    print('Getting basic info of %s', code)
     info = entrypoint.GetStockBasicInfoAsDict(code)
-    logging.info('Got basic info data (using GetStockBasicInfoAsDict):')
+    print('Got basic info data (using GetStockBasicInfoAsDict):')
     return info
 
 @app.route('/index_stock_data/<name>')
@@ -240,7 +240,7 @@ def order(code, count, action):
         logging.info('Sending order to buy %s, quantity of %s stock, at market price...', code, count)
         for event in entrypoint.OrderCall(sRQName, sScreenNo, sAccNo, nOrderType, sCode, nQty, nPrice,
                                           sHogaGb, sOrgOrderNo):
-            logging.info(event)
+            print(event)
         return "종목 %s %s개 %s주문" % (code, count, action)
     else:
         logging.info('Cannot send an order while market is not open, skipping...')
@@ -263,7 +263,7 @@ def update_database():
     # DB 한번에 업데이트
     #save_account_info() 각 종목 매매 후 업데이트로 변경
     save_index_stock_data('kospi')
-    print(stock_list)
+    logging.info(stock_list)
     for code in stock_list:
         save_daily_stock_data(code)
 
@@ -296,7 +296,7 @@ def get_name_by_code(code):
         return names_by_codes_dict_kosdaq[code]
 
 def save_account_info():
-    logging.debug("Account is updating...")
+    print("Account is updating...")
     actname = 'account_info'
     if stock_db.checkTableName(actname) == False:
         if stock_db.create_account_table() == False:
@@ -305,11 +305,11 @@ def save_account_info():
     df = pd.DataFrame(columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
 
     sAccNo_list = entrypoint.GetAccountList()
-    logging.info('Getting DepositInfo Data')
+    print('Getting DepositInfo Data')
     for sAccNo in sAccNo_list:
         deposit = entrypoint.GetDepositInfo(account_no=sAccNo)
-        logging.info('Got DepositInfo Data (using GetDepositInfo)')
-        logging.info('Getting Account Detail Data')
+        print('Got DepositInfo Data (using GetDepositInfo)')
+        print('Getting Account Detail Data')
 
         tname = 'account_detail_{}'.format(sAccNo)
         if stock_db.checkTableName(tname) == False:
@@ -324,7 +324,7 @@ def save_account_info():
                                 '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)']}],
                               columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
         df = df.append(record, ignore_index=True)
-        logging.info('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
+        print('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
         balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio', 'totalbuyprice']
         balancedetail = balancedetail.astype({'code': 'str', 'name': 'str', 'count': 'int', 'tradecount': 'int', 'winratio': 'float', 'havratio': 'float', 'totalbuyprice': 'int'})
         balancedetail['code'] = balancedetail['code'].apply(lambda _: _[1:]) # 종목코드 A 제거
@@ -338,7 +338,7 @@ def save_account_info():
 
 def save_index_stock_data(name, scrno=None):
     #업종코드 = 001:종합(KOSPI), 002:대형주, 003:중형주, 004:소형주 101:종합(KOSDAQ), 201:KOSPI200, 302:KOSTAR, 701: KRX100 나머지 ※ 업종코드 참고
-    logging.info('Checking TR info of opt20006')
+    print('Checking TR info of opt20006')
     tr_info = KiwoomOpenApiPlusTrInfo.get_trinfo_by_code('opt20006')
 
     print('Inputs of opt20006:\n'+str(tr_info.inputs))
@@ -353,7 +353,7 @@ def save_index_stock_data(name, scrno=None):
 
     if name in index_dict.keys():
         code = index_dict[name]
-        logging.debug("Index Name : %s is updating..." % name)
+        print("Index Name : %s is updating..." % name)
         tname = stock_db.getTableName(name)
         if stock_db.checkTableName(tname) == False:
             if stock_db.create_table(tname) == False:
@@ -393,7 +393,7 @@ def save_index_stock_data(name, scrno=None):
                 to_date = response.multi_data.values[-1].values[date_column_index]
                 from_date = datetime.strptime(from_date, date_format)
                 to_date = datetime.strptime(to_date, date_format)
-                logging.info("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
+                print("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
             
         df = pd.DataFrame.from_records(records, columns=columns)
         # date, open, high, low, close, volume
@@ -405,7 +405,7 @@ def save_index_stock_data(name, scrno=None):
         stock_db.save(tname, df)
 
 def save_daily_stock_data(code):
-    logging.debug("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
+    print("Stock Code : %s Name : %s is updating..." % (code, get_name_by_code(code)))
     tname = stock_db.getTableName(code)
     if stock_db.checkTableName(tname) == False:
         if stock_db.create_table_detail(tname) == False:
@@ -446,7 +446,7 @@ def save_daily_stock_data(code):
     stock_db.save_detail(tname, result)
 
 def detail_stock_data(code,start_date=None, end_date=None, include_end=False, scrno=None):
-    logging.info('Checking TR info of opt10086')
+    print('Checking TR info of opt10086')
     tr_info = KiwoomOpenApiPlusTrInfo.get_trinfo_by_code('opt10086')
 
     print('Inputs of opt10086:\n'+str(tr_info.inputs))
@@ -487,7 +487,7 @@ def detail_stock_data(code,start_date=None, end_date=None, include_end=False, sc
             to_date = response.multi_data.values[-1].values[date_column_index]
             from_date = datetime.strptime(from_date, date_format)
             to_date = datetime.strptime(to_date, date_format)
-            logging.info("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
+            print("Received %d records from %s to %s for code %s", nrows, from_date, to_date, code,)
 
     df = pd.DataFrame.from_records(records, columns=columns)
     return df
