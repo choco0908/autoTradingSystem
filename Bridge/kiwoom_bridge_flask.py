@@ -19,12 +19,14 @@ import pandas as pd
 from exchange_calendars import get_calendar
 
 # DB
-import threading
 from DataBase.SqliteDB import StockDB
 
 # Custom
 from datetime import datetime
 import logging
+
+# Telegram
+import telepot
 
 if not os.path.exists('log'):
     os.mkdir('log')
@@ -67,6 +69,16 @@ print('End stock codes and names...')
 
 # 6.주문처리
 krx_calendar = get_calendar('XKRX')
+
+# 7.telegram 등록
+def getToken():
+    f = open("telebot.txt")
+    token = f.readline().strip()
+    userid = f.readline().strip()
+    f.close()
+    return (token , userid)
+(token, chat_id) = getToken()
+bot = telepot.Bot(token)
 
 def as_json(f):
     @wraps(f)
@@ -241,6 +253,9 @@ def order(code, count, action):
         for event in entrypoint.OrderCall(sRQName, sScreenNo, sAccNo, nOrderType, sCode, nQty, nPrice,
                                           sHogaGb, sOrgOrderNo):
             print(event)
+
+        bot.sendMessage(chat_id=chat_id, text="%s %s개 %s" % (get_name_by_code(code), count, action))
+        update_account()
         return "종목 %s %s개 %s주문" % (code, count, action)
     else:
         logging.info('Cannot send an order while market is not open, skipping...')
