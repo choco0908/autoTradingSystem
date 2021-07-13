@@ -95,6 +95,16 @@ class StockDB:
         except:
             return None
 
+    def delete_account_detail_table(self, tname):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            create_sql = "DELETE FROM \'%s\'" % tname
+            cur.execute(create_sql)
+            return True
+        except:
+            return None
+
     def create_table(self, tname):
         c = self.conn
         try:

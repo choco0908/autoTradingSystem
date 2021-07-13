@@ -327,8 +327,10 @@ def save_account_info():
         print('Getting Account Detail Data')
 
         tname = 'account_detail_{}'.format(sAccNo)
-        if stock_db.checkTableName(tname) == False:
-            if stock_db.create_account_detail_table(tname) == False:
+        if stock_db.checkTableName(tname) == True:
+            stock_db.delete_account_detail_table(tname)
+        else:
+            if stock_db.create_account_detail_table(tname) == True:
                 logging.debug('account_detail_{} table create failed'.format(sAccNo))
 
         (totalbalance, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
