@@ -83,16 +83,31 @@ if __name__ == '__main__':
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
         initial_balance = int(base_balance / len(stock_df_list))
         for code in stock_code_param: # 신규 종목 매매
-            stock_dict.update({code: {'count': 0, 'value_net': '{}_{}_value_{}'.format(rl_method, net, code),
-                                      'policy_net': '{}_{}_policy_{}'.format(rl_method, net, code), 'rl_method': rl_method, 'net': net,
-                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': 0.0,
-                                      'havratio': 0.0, 'balance': initial_balance}})
+            if rl_method != 'a3c' :
+                value = '{}_{}_value_{}'.format(rl_method, net, code)
+                policy = '{}_{}_policy_{}'.format(rl_method, net, code)
+            else:
+                value = '{}_{}_value_train'.format(rl_method, net)
+                policy = '{}_{}_policy_train'.format(rl_method, net)
+            stock_dict.update({code: {'count': 0, 'value_net': value,
+                                      'policy_net': policy, 'rl_method': rl_method, 'net': net,
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': 0.0, 'havratio': 0.0,
+                                      #'balance': initial_balance}})
+                                      'balance': 10000000}})
         for stock in stock_df_list: # 기존 종목 매매
             code = stock['code']
             balance = initial_balance - stock['totalbuyprice'] if initial_balance > stock['totalbuyprice'] else 0
-            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': '{}_{}_value_{}'.format(rl_method, net, code),
-                                      'policy_net': '{}_{}_policy_{}'.format(rl_method, net, code), 'rl_method': rl_method, 'net': net,
-                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['havratio'], 'balance': balance}})
+            if rl_method != 'a3c':
+                value = '{}_{}_value_{}'.format(rl_method, net, code)
+                policy = '{}_{}_policy_{}'.format(rl_method, net, code)
+            else:
+                value = '{}_{}_value_train'.format(rl_method, net)
+                policy = '{}_{}_policy_train'.format(rl_method, net)
+            stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value,
+                                      'policy_net': policy, 'rl_method': rl_method, 'net': net,
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['havratio'],
+                                      #'balance': balance}})
+                                      'balance': 10000000}})
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
 
@@ -139,8 +154,12 @@ if __name__ == '__main__':
                 df = stock_db.load_nrows(tname, num_steps)
                 df = df[['date']]
                 df = df.astype({'date': 'str'})
-                start_date = df.iloc[num_steps-1]['date']
-                end_date = df.iloc[0]['date']
+                if start_date is None:
+                    start_date = df.iloc[num_steps-1]['date']
+                if end_date is None:
+                    end_date = df.iloc[0]['date']
+
+                print('from {} to {}, start analysis'.format(start_date,end_date))
                 num_epoches = 1
                 # 모델 경로 준비
                 value_network_path = os.path.join(settings.BASE_DIR, 'models/{}.h5'.format(stock_dict[code]['value_net']))

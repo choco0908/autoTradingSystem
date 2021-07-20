@@ -68,13 +68,16 @@ class Visualizer:
             ax.bar(x, volume, color='b', alpha=0.3)
 
             # 차트 5 MACD 지표
-            macd = np.array(training_data['macd'].to_list())
-            macdsignal = np.array(training_data['macdsignal'].to_list())
-            macdhist = np.array(training_data['macdhist'].to_list())
             self.axes[ChartIndex.MACD.value].set_ylabel('MACD')
-            self.axes[ChartIndex.MACD.value].plot(x, macd, color='limegreen', linestyle='-')
-            self.axes[ChartIndex.MACD.value].plot(x, macdsignal, color='violet', linestyle='-')
-            self.axes[ChartIndex.MACD.value].plot(x, macdhist, color='dodgerblue', linestyle='-')
+            if 'macd' in training_data.columns:
+                macd = np.array(training_data['macd'].to_list())
+                self.axes[ChartIndex.MACD.value].plot(x, macd, color='limegreen', linestyle='-')
+            if 'macdsignal' in training_data.columns:
+                macdsignal = np.array(training_data['macdsignal'].to_list())
+                self.axes[ChartIndex.MACD.value].plot(x, macdsignal, color='violet', linestyle='-')
+            if 'macdhist' in training_data.columns:
+                macdhist = np.array(training_data['macdhist'].to_list())
+                self.axes[ChartIndex.MACD.value].plot(x, macdhist, color='dodgerblue', linestyle='-')
 
             # 차트 6 RSI 지표
             rsi = np.array(training_data['rsi'].to_list())

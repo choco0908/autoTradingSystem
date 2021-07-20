@@ -22,9 +22,22 @@ COLUMNS_TRAINING_DATA_V1 = [
     'close_ma20_ratio', 'volume_ma20_ratio',
     'close_ma60_ratio', 'volume_ma60_ratio',
     'close_ma120_ratio', 'volume_ma120_ratio',
-    'rsi', 'macd', 'macdsignal', 'macdhist'
+    'rsi', 'macdhist'
 ]
 
+COLUMNS_TRAINING_DATA_V2 = [
+    'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
+    'close_lastclose_ratio', 'volume_lastvolume_ratio',
+    'close_ma5_ratio', 'volume_ma5_ratio',
+    'close_ma10_ratio', 'volume_ma10_ratio',
+    'close_ma20_ratio', 'volume_ma20_ratio',
+    'close_ma60_ratio', 'volume_ma60_ratio',
+    'close_ma120_ratio', 'volume_ma120_ratio',
+    'market_kospi_ma5_ratio', 'market_kospi_ma20_ratio',
+    'market_kospi_ma60_ratio', 'market_kospi_ma120_ratio',
+    'rsi', 'macdhist'
+]
+'''
 COLUMNS_TRAINING_DATA_V2 = [
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
     'close_lastclose_ratio', 'volume_lastvolume_ratio',
@@ -38,23 +51,27 @@ COLUMNS_TRAINING_DATA_V2 = [
     'bond_k3y_ma5_ratio', 'bond_k3y_ma20_ratio',
     'bond_k3y_ma60_ratio', 'bond_k3y_ma120_ratio'
 ]
+'''
 
 def preprocess(data, ver='v1'):
     close_list = np.asarray(data['close'], dtype='f8')
     volume_list = np.asarray(data['volume'], dtype='f8')
+    kospi_list = np.asarray(data['kospi'], dtype='f8')
 
     windows = [5, 10, 20, 60, 120]
     for window in windows: # 과거 데이터와 현재 데이터의 수 차이가 크기 때문에 비율로 처리
         data['close_ma{}'.format(window)] = data['close'].rolling(window).mean()
-        data['close_sma{}'.format(window)] = ta._ta_lib.SMA(close_list, window)
-        data['close_ema{}'.format(window)] = ta._ta_lib.EMA(close_list, window)
-        data['close_wma{}'.format(window)] = ta._ta_lib.WMA(close_list, window)
+        #data['close_sma{}'.format(window)] = ta._ta_lib.SMA(close_list, window)
+        #data['close_ema{}'.format(window)] = ta._ta_lib.EMA(close_list, window)
+        #data['close_wma{}'.format(window)] = ta._ta_lib.WMA(close_list, window)
         data['volume_ma{}'.format(window)] = data['volume'].rolling(window).mean()
-        data['volume_sma{}'.format(window)] = ta._ta_lib.SMA(volume_list, window)
-        data['volume_ema{}'.format(window)] = ta._ta_lib.EMA(volume_list, window)
-        data['volume_wma{}'.format(window)] = ta._ta_lib.WMA(volume_list, window)
+        #data['volume_sma{}'.format(window)] = ta._ta_lib.SMA(volume_list, window)
+        #data['volume_ema{}'.format(window)] = ta._ta_lib.EMA(volume_list, window)
+        #data['volume_wma{}'.format(window)] = ta._ta_lib.WMA(volume_list, window)
+        data['market_kospi_ma{}'.format(window)] = data['kospi'].rolling(window).mean()
         data['close_ma%d_ratio' % window] = (data['close'] - data['close_ma%d' % window]) / data['close_ma%d' % window]
         data['volume_ma%d_ratio' % window] = (data['volume'] - data['volume_ma%d' % window]) / data['volume_ma%d' % window]
+        data['market_kospi_ma%d_ratio' % window] = (data['kospi'] - data['market_kospi_ma%d' % window]) / data['market_kospi_ma%d' % window]
 
     # 이동 평균 종가 비율 : (현재 종가 - 이동평균값)/이동평균값
 
@@ -82,9 +99,19 @@ def load_data(code, date_from, date_to, ver='v2'):
     stock_db = StockDB()
     tname = stock_db.getTableName(code)
     df = stock_db.load(tname)
+    if ver == 'v2':
+        kname = stock_db.getTableName('kospi')
+        kdf = stock_db.load(kname)
+        kdf = kdf[['date', 'close']]
+        kdf.columns = ['date', 'kospi']
+        result = pd.merge(df, kdf, how='inner', on='date')
 
     if ver == 'v1':
         df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    elif ver == 'v2':
+        result.columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'kospi']
+        df = result
+
 
     # 날짜 오름차순 정렬
     data = df.sort_values(by='date').reset_index()
@@ -106,7 +133,7 @@ def load_data(code, date_from, date_to, ver='v2'):
         training_data = data[COLUMNS_TRAINING_DATA_V1]
     elif ver == 'v2':
         training_data = data[COLUMNS_TRAINING_DATA_V2]
-        training_data = training_data.apply(np.tanh)
+        #training_data = training_data.apply(np.tanh)
     else:
         raise Exception('Invalid version.')
 
