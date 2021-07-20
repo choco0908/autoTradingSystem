@@ -56,7 +56,8 @@ COLUMNS_TRAINING_DATA_V2 = [
 def preprocess(data, ver='v1'):
     close_list = np.asarray(data['close'], dtype='f8')
     volume_list = np.asarray(data['volume'], dtype='f8')
-    kospi_list = np.asarray(data['kospi'], dtype='f8')
+    if ver == 'v2':
+        kospi_list = np.asarray(data['kospi'], dtype='f8')
 
     windows = [5, 10, 20, 60, 120]
     for window in windows: # 과거 데이터와 현재 데이터의 수 차이가 크기 때문에 비율로 처리
@@ -68,10 +69,11 @@ def preprocess(data, ver='v1'):
         #data['volume_sma{}'.format(window)] = ta._ta_lib.SMA(volume_list, window)
         #data['volume_ema{}'.format(window)] = ta._ta_lib.EMA(volume_list, window)
         #data['volume_wma{}'.format(window)] = ta._ta_lib.WMA(volume_list, window)
-        data['market_kospi_ma{}'.format(window)] = data['kospi'].rolling(window).mean()
         data['close_ma%d_ratio' % window] = (data['close'] - data['close_ma%d' % window]) / data['close_ma%d' % window]
         data['volume_ma%d_ratio' % window] = (data['volume'] - data['volume_ma%d' % window]) / data['volume_ma%d' % window]
-        data['market_kospi_ma%d_ratio' % window] = (data['kospi'] - data['market_kospi_ma%d' % window]) / data['market_kospi_ma%d' % window]
+        if ver == 'v2':
+            data['market_kospi_ma{}'.format(window)] = data['kospi'].rolling(window).mean()
+            data['market_kospi_ma%d_ratio' % window] = (data['kospi'] - data['market_kospi_ma%d' % window]) / data['market_kospi_ma%d' % window]
 
     # 이동 평균 종가 비율 : (현재 종가 - 이동평균값)/이동평균값
 
