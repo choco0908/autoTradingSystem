@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 from DataBase.SqliteDB import StockDB
 
-COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
+COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume', 'rsi', 'macdhist']
 
 COLUMNS_TRAINING_DATA_V1 = [
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
@@ -119,7 +119,7 @@ def load_data(code, date_from, date_to, ver='v2'):
     data = df.sort_values(by='date').reset_index()
 
     # 데이터 전처리
-    data = preprocess(data)
+    data = preprocess(data, ver=ver)
 
     # 기간 필터링
     data = data.astype({'date': 'str'})
@@ -135,7 +135,7 @@ def load_data(code, date_from, date_to, ver='v2'):
         training_data = data[COLUMNS_TRAINING_DATA_V1]
     elif ver == 'v2':
         training_data = data[COLUMNS_TRAINING_DATA_V2]
-        #training_data = training_data.apply(np.tanh)
+        training_data = training_data.apply(np.tanh)
     else:
         raise Exception('Invalid version.')
 
