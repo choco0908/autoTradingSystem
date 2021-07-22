@@ -5,6 +5,7 @@ from talib import MA_Type
 
 import pandas as pd
 import numpy as np
+from scipy.stats import zscore
 
 import sys
 import os
@@ -12,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 from DataBase.SqliteDB import StockDB
 
-COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume', 'rsi', 'macdhist']
+COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
 
 COLUMNS_TRAINING_DATA_V1 = [
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
@@ -135,6 +136,8 @@ def load_data(code, date_from, date_to, ver='v2'):
         training_data = data[COLUMNS_TRAINING_DATA_V1]
     elif ver == 'v2':
         training_data = data[COLUMNS_TRAINING_DATA_V2]
+        training_data['rsi'] = zscore(training_data['rsi'])
+        training_data['macdhist'] = zscore(training_data['macdhist'])
         training_data = training_data.apply(np.tanh)
     else:
         raise Exception('Invalid version.')

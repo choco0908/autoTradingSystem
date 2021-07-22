@@ -73,7 +73,7 @@ class Agent:
     def reset_exploration(self, alpha=None):
         if alpha is None:
             alpha = np.random.rand() / 2
-        self.exploration_base = 0.5 + alpha
+        self.exploration_base = 0.3 + alpha
 
     def set_balance(self, balance):
         self.initial_balance = balance
