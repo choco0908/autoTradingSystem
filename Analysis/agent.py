@@ -182,7 +182,6 @@ class Agent:
                 self.balance += invest_amount  # 보유 현금을 갱신
                 self.num_sell += 1  # 매도 횟수 증가
             if self.reuse_models:
-                print()
                 trading_url = 'http://127.0.0.1:5000/order/{}/{}/sell'.format(self.stock_code, str(trading_unit))
                 response = requests.get(trading_url)
                 print('sell {} stocks , status = {}'.format(str(trading_unit),str(response.status_code)))

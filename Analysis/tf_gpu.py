@@ -33,8 +33,8 @@ if __name__ == '__main__':
     parser.add_argument('--policy_network_name')
     parser.add_argument('--reuse_models', action='store_true') # 신경망 재사용 유무
     parser.add_argument('--learning', action='store_true') # 강화학습 유무
-    parser.add_argument('--start_date', default='20170101')
-    parser.add_argument('--end_date', default='20171231')
+    parser.add_argument('--start_date')
+    parser.add_argument('--end_date')
     parser.add_argument('--base_num_stocks', type=int, default=0)
     parser.add_argument('--update', action='store_true')
     args = parser.parse_args()
@@ -92,8 +92,8 @@ if __name__ == '__main__':
             stock_dict.update({code: {'count': 0, 'value_net': value,
                                       'policy_net': policy, 'rl_method': rl_method, 'net': net,
                                       'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': 0.0, 'havratio': 0.0,
-                                      #'balance': initial_balance}})
-                                      'balance': 10000000}})
+                                      'balance': initial_balance}})
+                                      #'balance': 10000000}})
         for stock in stock_df_list: # 기존 종목 매매
             code = stock['code']
             balance = initial_balance - stock['totalbuyprice'] if initial_balance > stock['totalbuyprice'] else 0
@@ -106,8 +106,8 @@ if __name__ == '__main__':
             stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value,
                                       'policy_net': policy, 'rl_method': rl_method, 'net': net,
                                       'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['havratio'],
-                                      #'balance': balance}})
-                                      'balance': 10000000}})
+                                      'balance': balance}})
+                                      #'balance': 10000000}})
         if len(stock_code_param) == 0:
             stock_code_param = stock_dict.keys()
 
