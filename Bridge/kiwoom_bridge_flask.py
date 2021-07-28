@@ -256,7 +256,7 @@ def order(code, count, action):
 
         bot.sendMessage(chat_id=chat_id, text="%s %s개 %s" % (get_name_by_code(code), count, action))
         update_account()
-        update_trading_record(get_name_by_code(code), code, count, action)
+        update_trading_record(code, get_name_by_code(code), count, action)
         return "종목 %s %s개 %s주문" % (code, count, action)
     else:
         logging.info('Cannot send an order while market is not open, skipping...')
