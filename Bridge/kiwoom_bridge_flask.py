@@ -256,6 +256,7 @@ def order(code, count, action):
 
         bot.sendMessage(chat_id=chat_id, text="%s %s개 %s" % (get_name_by_code(code), count, action))
         update_account()
+        update_trading_record(get_name_by_code(code), code, count, action)
         return "종목 %s %s개 %s주문" % (code, count, action)
     else:
         logging.info('Cannot send an order while market is not open, skipping...')
@@ -508,6 +509,17 @@ def detail_stock_data(code,start_date=None, end_date=None, include_end=False, sc
 
     df = pd.DataFrame.from_records(records, columns=columns)
     return df
+
+def update_trading_record(code, name, count, action):
+    print("Stock Code : %s Name : %s %s개 %s recorded" % (code, name, count, action))
+    tname = 'trading_record'
+    if stock_db.checkTableName(tname) == False:
+        if stock_db.create_trading_record_table() == False:
+            logging.debug(tname + ' table create failed')
+
+    if action == 'sell':
+        count = -int(count)
+    stock_db.save_trading_record_table(datetime.today().strftime('%Y%m%d'), code, name, count)
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')

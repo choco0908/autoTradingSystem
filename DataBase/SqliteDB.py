@@ -65,6 +65,35 @@ class StockDB:
         except:
             return None
 
+    def create_trading_record_table(self):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            create_sql = "CREATE TABLE trading_record (date DATETIME, code TEXT, name TEXT, tradingcount INTEGER);"
+            cur.execute(create_sql)
+            return True
+        except:
+            print("trading_record table creating fail")
+
+    def save_trading_record_table(self, date, code, name, tradingcount):
+        c = self.conn
+        try:
+            cur = c.cursor()
+            sql = "INSERT INTO trading_record ('date', 'code', 'name', 'tradingcount') VALUES(?, ?, ?, ?)"
+            cur.execute(sql, (date, code, name, tradingcount))
+            c.commit()
+        except:
+            return None
+
+    def load_trading_record_table(self):
+        c = self.conn
+        try:
+            sql = "SELECT date, code, name, tradingcount FROM trading_record"
+            df = pd.read_sql(sql, c, index_col=None)
+            return df
+        except:
+            return None
+
     def create_account_detail_table(self, tname):
         c = self.conn
         try:
