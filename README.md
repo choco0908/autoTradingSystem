@@ -15,3 +15,17 @@
 
 3. DataBase
  - store and share database with sqlite3
+
+# Requirements and Environment
+
+1. Trader
+ - python 3.6
+ - trader is using tensorflow, numpy, pandas, scipy, talib
+
+2. Bridge Server
+ - python 3.7 32bit
+ - koapy (https://koapy.readthedocs.io/en/latest/index.html)
+ - kiwoom OpenApi+ (https://www.kiwoom.com/h/customer/download/VOpenApiInfoView)
+
+# Details
+
