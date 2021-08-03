@@ -60,3 +60,16 @@ Use Anaconda (Python distribution platform)
 2. Make python3.7 32bit and python3.6 in venv (using conda create)
 3. Install each python packages with requirements
 4. Install CUDA Toolkit (https://developer.nvidia.com/cuda-toolkit-archive) for GPU
+
+# Testing
+
+1. To learning
+    - activate py36
+    - python Analysis\tf_gpu.py --stock_code {$} --rl_method {$} --net {$} --num_steps {$} --output_name {$} --learning --num_epoches {$} --lr {$} --start_epsilon {$} --discount_factor {$} --ver {$} --delayed_reward_threshold {$} --start_date {$} --end_date {$} --value_network_name {$} --policy_network_name {$}
+    
+2. To Trading
+    - activate py37_32
+    - python Bridge\kiwoom_bridge_flask.py
+      
+    - activate py36
+    - python Analysis\tf_gpu.py --stock_code {$} --reuse_models --rl_method {$} --net {$} --ver {$} 
