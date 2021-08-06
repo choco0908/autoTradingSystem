@@ -105,7 +105,7 @@ if __name__ == '__main__':
                 policy = '{}_{}_policy_train'.format(rl_method, net)
             stock_dict.update({code: {'count': stock['tradecount'], 'value_net': value,
                                       'policy_net': policy, 'rl_method': rl_method, 'net': net,
-                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['havratio'],
+                                      'output': '{}_{}'.format(datetime.datetime.today().strftime('%Y%m%d'), code), 'winratio': stock['winratio'], 'havratio': stock['totalbuyprice'] / initial_balance,
                                       'balance': balance}})
                                       #'balance': 10000000}})
         if len(stock_code_param) == 0:
