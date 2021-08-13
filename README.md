@@ -29,6 +29,7 @@ Use Anaconda (Python distribution platform)
  - koapy (https://koapy.readthedocs.io/en/latest/index.html)
  - kiwoom OpenApi+ (https://www.kiwoom.com/h/customer/download/VOpenApiInfoView)
  - Flask
+ - pip install python-dateutil flask mpld3 koapy
 
 # Ideas
 
