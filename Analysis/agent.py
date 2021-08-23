@@ -189,7 +189,9 @@ class Agent:
         elif action == Agent.ACTION_HOLD:
             self.num_hold += 1 # 관망 횟수 증가
             if self.reuse_models:
-                print('hold action')
+                trading_url = 'http://127.0.0.1:5000/order/{}/0/hold'.format(self.stock_code)
+                response = requests.get(trading_url)
+                print('hold action , status = {}'.format(str(response.status_code)))
 
         # 포트폴리오 가치 갱신
         self.portfolio_value = self.balance + curr_price * self.num_stocks #현금 + 현재가*주식수

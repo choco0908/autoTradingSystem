@@ -240,7 +240,7 @@ def order(code, count, action):
     sRQName = code + ' 주식 '+action
     sScreenNo = '1000'  # 화면번호, 0000 을 제외한 4자리 숫자 임의로 지정
     sAccNo = entrypoint.GetAccountList()[0]  # 계좌번호 10자리, GetFirstAvailableAccount() : 계좌번호 목록에서 첫번째로 발견한 계좌번호
-    nOrderType = 1 if action == 'buy' else 2
+    nOrderType = 1 if action == 'buy' else 2 if action == 'sell' else 3
     sCode = code
     nQty = count
     nPrice = 0
@@ -249,7 +249,12 @@ def order(code, count, action):
 
     # 현재는 기본적으로 주문수량이 모두 소진되기 전까지 이벤트를 듣도록 되어있음 (단순 호출 예시)
     if is_currently_in_session():
-        logging.info('Sending order to buy %s, quantity of %s stock, at market price...', code, count)
+        if action == 'hold':
+            logging.info('Holding action')
+            bot.sendMessage(chat_id=chat_id, text="%s %s" % (get_name_by_code(code), action))
+            return "종목 %s %s" % (code, action)
+
+        logging.info('Sending order to %s %s, quantity of %s stock, at market price...', action, code, count)
         for event in entrypoint.OrderCall(sRQName, sScreenNo, sAccNo, nOrderType, sCode, nQty, nPrice,
                                           sHogaGb, sOrgOrderNo):
             print(event)
