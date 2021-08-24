@@ -78,7 +78,7 @@ if __name__ == '__main__':
         print('update_account ' + str(response.status_code))
         stock_db = StockDB()
         account = stock_db.load_account_table().iloc[0].to_dict()
-        base_balance = int(account['balance']) + int(account['totalbalance'])
+        base_balance = int(account['pvtotalbalance'])
         tname = 'account_detail_' + account['accountno']
         stock_df_list = stock_db.load_account_detail_table(tname).to_dict('records')
         initial_balance = int(base_balance / len(stock_df_list))

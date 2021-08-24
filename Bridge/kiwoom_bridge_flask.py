@@ -323,7 +323,7 @@ def save_account_info():
         if stock_db.create_account_table() == False:
             logging.debug('Account table create failed')
 
-    df = pd.DataFrame(columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
+    df = pd.DataFrame(columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산'])
 
     sAccNo_list = entrypoint.GetAccountList()
     print('Getting DepositInfo Data')
@@ -340,12 +340,12 @@ def save_account_info():
                 logging.debug('account_detail_{} table create failed'.format(sAccNo))
 
         (totalbalance, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
-        totalbalance = totalbalance[['총매입금액', '총평가금액', '총수익률(%)']]
+        totalbalance = totalbalance[['총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산']]
         balancedetail = balancedetail[
             ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)', '매입금액']]
         record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액'], '총매입금액': totalbalance['총매입금액'],
-                                '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)']}],
-                              columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'])
+                                '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)'], '추정예탁자산': totalbalance['추정예탁자산']}],
+                              columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산'])
         df = df.append(record, ignore_index=True)
         print('Got Account Detail Data (using GetAccountEvaluationBalanceAsSeriesAndDataFrame)')
         balancedetail.columns = ['code', 'name', 'count', 'tradecount', 'winratio', 'havratio', 'totalbuyprice']
@@ -354,9 +354,9 @@ def save_account_info():
         stock_db.save_account_detail_table(tname, balancedetail)
 
     df['계좌번호'] = pd.Series(sAccNo_list)
-    df.columns = ['balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio', 'accountno']
-    # '계좌번호', '예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)'
-    df = df[['accountno', 'balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio']]
+    df.columns = ['balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio', 'pvtotalbalance', 'accountno']
+    # '계좌번호', '예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산'
+    df = df[['accountno', 'balance', 'cash', 'totalbalance', 'pvbalance', 'totalwinratio', 'pvtotalbalance']]
     stock_db.save_account_table(df)
 
 def save_index_stock_data(name, scrno=None):
