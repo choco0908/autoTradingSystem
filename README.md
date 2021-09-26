@@ -23,7 +23,7 @@ Use Anaconda (Python distribution platform)
 1. Trader
  - python 3.6
  - trader is using tensorflow, numpy, pandas, scipy, talib
- - pip install TA_Lib-0.4.19-cp36-cp36m-win_amd64.whl tensorflow-gpu=1.15.2 pandas scipy requests matplotlib mplfinance keras==2.2.4 h5py==2.10.0
+ - pip install TA_Lib-0.4.19-cp36-cp36m-win_amd64.whl tensorflow-gpu==1.15.2 pandas scipy requests matplotlib mplfinance keras==2.2.4 h5py==2.10.0
 
 2. Bridge Server
  - python 3.7 32bit
