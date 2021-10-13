@@ -50,7 +50,7 @@ entrypoint = KiwoomOpenApiPlusEntrypoint()
 # 2. 로그인
 print('Logging in...')
 entrypoint.EnsureConnected()
-print('Logged in.')
+logging.info('Logged in.')
 base_account = entrypoint.GetAccountList()[0]
 
 # 3. kospi/kosdaq 종목리스트 저장
@@ -64,7 +64,7 @@ codes = entrypoint.GetKosdaqCodeList()
 names = [entrypoint.GetMasterCodeName(code) for code in codes]
 codes_by_names_dict_kosdaq = dict(zip(names, codes))
 names_by_codes_dict_kosdaq = dict(zip(codes, names))
-print('End stock codes and names...')
+logging.info('End stock codes and names...')
 
 
 # 6.주문처리
@@ -341,8 +341,11 @@ def save_account_info():
 
         (totalbalance, balancedetail) = entrypoint.GetAccountEvaluationBalanceAsSeriesAndDataFrame(account_no=sAccNo)
         totalbalance = totalbalance[['총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산']]
-        balancedetail = balancedetail[
-            ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)', '매입금액']]
+        if len(balancedetail) == 0 :
+            balancedetail = pd.DataFrame([["TEST","TEST",0,0,0.0,0.0,0]],columns=['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)', '매입금액'])
+        else :
+            balancedetail = balancedetail[
+                ['종목번호', '종목명', '보유수량', '매매가능수량', '수익률(%)', '보유비중(%)', '매입금액']]
         record = pd.DataFrame([{'예수금': deposit['예수금'], '출금가능금액': deposit['출금가능금액'], '총매입금액': totalbalance['총매입금액'],
                                 '총평가금액': totalbalance['총평가금액'], '총수익률(%)': totalbalance['총수익률(%)'], '추정예탁자산': totalbalance['추정예탁자산']}],
                               columns=['예수금', '출금가능금액', '총매입금액', '총평가금액', '총수익률(%)', '추정예탁자산'])

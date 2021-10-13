@@ -147,17 +147,18 @@ if __name__ == '__main__':
                 win_stock_ratio = stock_dict[stock_code]['winratio']
                 have_stock_ratio = stock_dict[stock_code]['havratio']
                 balance = stock_dict[stock_code]['balance']
+                load_steps = 6
                 num_steps = 5
                 start_epsilon = 0
                 # num_steps 수만큼 데이터 불러옴
                 tname = 'StockData_{}'.format(stock_code)
-                df = stock_db.load_nrows(tname, num_steps)
+                df = stock_db.load_nrows(tname, load_steps)
                 df = df[['date']]
                 df = df.astype({'date': 'str'})
                 if start_date is None:
-                    start_date = df.iloc[num_steps-1]['date']
+                    start_date = df.iloc[num_steps]['date']
                 if end_date is None:
-                    end_date = df.iloc[0]['date']
+                    end_date = df.iloc[1]['date']
 
                 print('from {} to {}, start analysis'.format(start_date,end_date))
                 num_epoches = 1
@@ -175,7 +176,7 @@ if __name__ == '__main__':
                 max_trading_unit = max(int(1000000 / chart_data.iloc[-1]['close']), 1)
 
                 # 공통 파라미터 설정
-                common_params = {'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
+                common_params = {'base_num_stocks': base_num_stocks,'rl_method': rl_method, 'delayed_reward_threshold': delayed_reward_threshold,
                                  'net': net, 'num_steps': num_steps, 'lr': lr, 'output_path': output_path,
                                  'reuse_models': reuse_models, 'win_stock_ratio': float(win_stock_ratio), 'have_stock_ratio': float(have_stock_ratio)}
 

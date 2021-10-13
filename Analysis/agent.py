@@ -131,6 +131,7 @@ class Agent:
             # 주식 잔고가 있는지 확인
             if self.num_stocks <= 0:
                 validity = False
+        print('validate_action : stocks = {} , action = {} , validity = {}'.format(str(self.num_stocks),str(action),str(validity)))
         return validity
 
     def decide_trading_unit(self, confidence): # 정책신경망 값이 높을수록 매매 단위 설정 크게 만듬
